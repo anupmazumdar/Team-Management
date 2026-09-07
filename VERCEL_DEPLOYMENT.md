@@ -2,6 +2,15 @@
 
 This guide explains how to deploy the **Vite React Frontend** to **Vercel** with the backend hosted on **Render** (for persistent Socket.IO WebSockets).
 
+> [!WARNING]
+> ### 🛑 DO NOT DEPLOY BACKEND TO VERCEL
+> **Do not create a Vercel project for the backend — it must run on Render per `render.yaml`. Only the `client/` folder should ever be deployed to Vercel.**
+> If an accidental Vercel project named like the backend exists (e.g. `team-management-server`):
+> 1. Delete the duplicate backend project in Vercel.
+> 2. For the frontend project, verify **Settings** → **General** → **Root Directory**:
+>    - If using root `vercel.json`: Root Directory = `./`, Build Command = `npm run build --prefix client`, Output Directory = `client/dist`.
+>    - If using `client` directly: Root Directory = `client`, Build Command = `npm run build`, Output Directory = `dist`.
+
 ---
 
 ## ⚡ Recommended Setup: Root Directory = Repository Root (`./`)

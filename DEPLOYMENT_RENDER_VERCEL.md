@@ -69,6 +69,26 @@ If you prefer creating the Web Service manually:
 
 ---
 
+> [!WARNING]
+> ### 🛑 DEPLOYMENT ARCHITECTURE RULES (AVOID MIX-UPS)
+> **Do not create a Vercel project for the backend — it must run on Render per `render.yaml`. Only the `client/` folder should ever be deployed to Vercel.**
+>
+> The backend requires a long-running Node.js process with persistent Socket.IO WebSockets and direct Prisma database access, which Render handles natively. Vercel is strictly for the static compiled React frontend.
+>
+> **If you accidentally created a Vercel project named like the backend (e.g., `team-management-server`):**
+> 1. In your Vercel Dashboard, delete the project if you already have a separate client project.
+> 2. Or, if this is your primary Vercel project, configure it to correctly point to the frontend:
+>    - Go to **Vercel Dashboard** → Select Project → **Settings** → **General**.
+>    - Scroll to **Root Directory**:
+>      - Leave as `./` (repository root) if relying on the root [`vercel.json`](vercel.json) (`npm run build --prefix client` and `client/dist`).
+>      - Or click **Edit** and set Root Directory to `client` if you prefer building isolated inside the client subfolder.
+>    - Under **Build & Development Settings**:
+>      - If Root Directory is `./`: Build Command = `npm run build --prefix client`, Output Directory = `client/dist`.
+>      - If Root Directory is `client`: Build Command = `npm run build`, Output Directory = `dist`.
+>    - Save and click **Redeploy**.
+
+---
+
 ## ⚡ Step 2: Deploy Frontend on Vercel (Approx. 2 mins)
 
 1. Log in to [vercel.com](https://vercel.com).

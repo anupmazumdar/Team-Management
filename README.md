@@ -87,18 +87,24 @@ Copy `.env.example` to `.env` in the `server` directory:
 cp server/.env.example server/.env
 ```
 
-Configure `server/.env` with your actual credentials (see `.env.example` for required variable names):
+Configure `server/.env` with your credentials using safe placeholders:
 ```ini
-PORT=
-DATABASE_URL=
-JWT_SECRET=
-JWT_EXPIRES_IN=
-CLIENT_URL=
-UPLOAD_DIR=
-CORS_ORIGIN=
+PORT=5000
+NODE_ENV=development
+DATABASE_URL="postgresql://<DB_USER>:<DB_PASSWORD>@<EP_HOSTNAME>.us-east-2.aws.neon.tech/neondb?sslmode=require"
+JWT_SECRET="<REPLACE_WITH_YOUR_NEW_32_CHAR_RANDOM_SECRET_KEY>"
+JWT_EXPIRES_IN="7d"
+CLIENT_URL="http://localhost:5173"
+UPLOAD_DIR="./uploads"
+CORS_ORIGIN="http://localhost:5173"
 ```
 
-> **Security Note**: Never commit actual credentials to git. If database credentials or JWT secrets were ever previously committed in git history, rotate them immediately in Neon and generate a new JWT secret.
+> [!CAUTION]
+> **ACTION REQUIRED: ROTATE EXPOSED SECRETS**
+> If real Neon PostgreSQL connection strings (with passwords) or JWT secrets were ever committed in git history or publicly visible:
+> 1. **Rotate your Neon Database Password immediately**: In the [Neon Console](https://console.neon.tech), select your project and reset the password for your database user.
+> 2. **Rotate `JWT_SECRET`**: Generate a fresh 32+ character random string.
+> 3. **Update Production**: Update both values in your Render Web Service environment variables and your local `.env`. Never commit `.env` files to git.
 
 ### 3. Initialize & Seed Database
 ```bash
