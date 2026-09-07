@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { useAuth0 } from '@auth0/auth0-react';
 import { X, Shield, ArrowRight, Sparkles, ExternalLink, Check } from 'lucide-react';
 
 export type SocialProvider = 'google' | 'github';
@@ -30,8 +29,6 @@ export const SocialAuthModal: React.FC<SocialAuthModalProps> = ({
   onRealGitHubSignIn,
   loading,
 }) => {
-  const { loginWithRedirect } = useAuth0();
-
   const getDefaults = (p: SocialProvider | null) => {
     switch (p) {
       case 'google':
@@ -79,14 +76,12 @@ export const SocialAuthModal: React.FC<SocialAuthModalProps> = ({
   const providerMeta = {
     google: {
       name: 'Google',
-      auth0Connection: 'google-oauth2',
       badgeColor: 'bg-red-500/10 text-red-400 border-red-500/30',
       iconBg: 'bg-white text-slate-900',
       accentColor: 'from-blue-600 via-red-500 to-amber-500',
     },
     github: {
       name: 'GitHub',
-      auth0Connection: 'github',
       badgeColor: 'bg-slate-700/30 text-slate-200 border-slate-600',
       iconBg: 'bg-slate-900 text-white border border-slate-700',
       accentColor: 'from-slate-800 to-slate-950',
@@ -106,16 +101,12 @@ export const SocialAuthModal: React.FC<SocialAuthModalProps> = ({
     });
   };
 
-  const handleLiveOAuth = async () => {
-    try {
-      await loginWithRedirect({
-        authorizationParams: {
-          connection: providerMeta.auth0Connection,
-          redirect_uri: window.location.origin,
-        },
-      });
-    } catch (err) {
-      console.warn('Live OAuth redirect failed, falling back to instant sync:', err);
+  const handleLiveOAuth = () => {
+    if (provider === 'google' && onRealGoogleSignIn) {
+      onRealGoogleSignIn();
+    } else if (provider === 'github' && onRealGitHubSignIn) {
+      onRealGitHubSignIn();
+    } else {
       handleInstantSubmit({ preventDefault: () => {} } as any);
     }
   };
@@ -307,7 +298,7 @@ export const SocialAuthModal: React.FC<SocialAuthModalProps> = ({
           ) : (
             <div className="space-y-4 text-xs">
               <p className="text-slate-300 leading-relaxed">
-                Connects through Auth0 Universal Social Connection (<strong>{providerMeta.auth0Connection}</strong>) directly to {providerMeta.name} OAuth servers.
+                Connects directly to {providerMeta.name} OAuth 2.0 servers with auto-verification and profile synchronization.
               </p>
 
               <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-400 space-y-2">
