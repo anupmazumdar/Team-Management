@@ -176,7 +176,7 @@ exportRouter.get('/team', authenticateToken, async (req: Request, res: Response)
     const members = await prisma.teamMember.findMany({
       where: { teamId, removedAt: null },
       include: {
-        user: { select: { fullName: true, email: true, title: true } },
+        user: { select: { fullName: true, email: true, title: true, authProvider: true } },
       },
     });
 
@@ -185,6 +185,7 @@ exportRouter.get('/team', authenticateToken, async (req: Request, res: Response)
       'Email',
       'Title',
       'Role',
+      'Auth Provider',
       'Joined At',
       'Assigned Tasks',
       'Completed Tasks',
@@ -225,6 +226,7 @@ exportRouter.get('/team', authenticateToken, async (req: Request, res: Response)
           escapeCsv(m.user.email),
           escapeCsv(m.user.title || ''),
           escapeCsv(m.role.toUpperCase()),
+          escapeCsv((m.user.authProvider || 'local').toUpperCase()),
           escapeCsv(m.joinedAt.toISOString()),
           assigned,
           completed,

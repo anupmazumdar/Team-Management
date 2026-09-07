@@ -245,6 +245,137 @@ authRouter.post('/auth0-sync', async (req: Request, res: Response) => {
   }
 });
 
+// Universal Social OAuth Sync (Google, GitHub, LinkedIn, Auth0)
+authRouter.post('/social-sync', async (req: Request, res: Response) => {
+  try {
+    const { provider, providerId, email, fullName, avatarUrl, headline } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required from OAuth profile.' });
+    }
+
+    const validProviders = ['google', 'github', 'linkedin', 'auth0'];
+    const chosenProvider = validProviders.includes((provider || '').toLowerCase())
+      ? (provider || '').toLowerCase()
+      : 'oauth';
+
+    const cleanEmail = email.toLowerCase().trim();
+
+    // Check if user exists by auth0Id (used as universal oauth id) or email
+    let user = await prisma.user.findFirst({
+      where: {
+        OR: [
+          providerId ? { auth0Id: providerId } : {},
+          { email: cleanEmail },
+        ],
+      },
+      include: {
+        teamMembers: {
+          where: { removedAt: null },
+          include: { team: true },
+        },
+      },
+    });
+
+    if (user) {
+      // Update details and link oauth provider
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          auth0Id: providerId || user.auth0Id,
+          authProvider: chosenProvider,
+          fullName: fullName?.trim() || user.fullName,
+          avatarUrl: avatarUrl || user.avatarUrl,
+          title: headline || user.title,
+        },
+        include: {
+          teamMembers: {
+            where: { removedAt: null },
+            include: { team: true },
+          },
+        },
+      });
+    } else {
+      // Provision new user in PostgreSQL
+      const primaryTeam = await prisma.team.findFirst({
+        orderBy: { createdAt: 'asc' },
+      });
+
+      user = await prisma.user.create({
+        data: {
+          email: cleanEmail,
+          fullName: fullName?.trim() || cleanEmail.split('@')[0],
+          avatarUrl: avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${cleanEmail}`,
+          title: headline || `${chosenProvider.toUpperCase()} Verified Member`,
+          auth0Id: providerId || null,
+          authProvider: chosenProvider,
+        },
+        include: {
+          teamMembers: {
+            where: { removedAt: null },
+            include: { team: true },
+          },
+        },
+      });
+
+      // Automatically attach user to primary workspace
+      if (primaryTeam) {
+        await prisma.teamMember.create({
+          data: {
+            teamId: primaryTeam.id,
+            userId: user.id,
+            role: 'member',
+          },
+        });
+
+        // Re-fetch user with team membership
+        user = (await prisma.user.findUnique({
+          where: { id: user.id },
+          include: {
+            teamMembers: {
+              where: { removedAt: null },
+              include: { team: true },
+            },
+          },
+        })) as any;
+      }
+    }
+
+    if (!user) {
+      return res.status(500).json({ error: 'Failed to synchronize OAuth user.' });
+    }
+
+    // Sign JWT
+    const token = jwt.sign(
+      { id: user.id, email: user.email, fullName: user.fullName },
+      ENV.JWT_SECRET,
+      { expiresIn: ENV.JWT_EXPIRES_IN as any }
+    );
+
+    return res.json({
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        fullName: user.fullName,
+        title: user.title,
+        avatarUrl: user.avatarUrl,
+        authProvider: user.authProvider,
+      },
+      teams: (user.teamMembers || []).map((tm: any) => ({
+        teamId: tm.teamId,
+        teamName: tm.team.name,
+        teamSlug: tm.team.slug,
+        role: tm.role,
+        joinedAt: tm.joinedAt,
+      })),
+    });
+  } catch (err: any) {
+    console.error('Social OAuth Sync Error:', err);
+    return res.status(500).json({ error: 'Failed to synchronize social OAuth account.', details: err?.message || String(err) });
+  }
+});
+
 // Get current authenticated user profile + dynamic teams & current roles
 authRouter.get('/me', authenticateToken, async (req: Request, res: Response) => {
   try {
