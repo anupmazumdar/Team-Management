@@ -98,10 +98,21 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
       const client = window.google.accounts.oauth2.initTokenClient({
         client_id: GOOGLE_CLIENT_ID,
         scope: 'openid email profile',
+        error_callback: (nonOAuthErr: any) => {
+          console.error('Google Sign-In error_callback:', nonOAuthErr);
+          if (nonOAuthErr.type === 'popup_failed_to_open') {
+            setError('Google popup was blocked. Please disable AdBlock or allow popups for this site.');
+          } else if (nonOAuthErr.type === 'popup_closed') {
+            setError('Google popup was closed before completing login.');
+          } else {
+            setError(`Google Sign-In: ${nonOAuthErr.message || nonOAuthErr.type || 'Origin error. Ensure https://team-management-server-pied.vercel.app is added to Authorized JavaScript Origins in Google Cloud Console.'}`);
+          }
+          setSocialLoading(false);
+        },
         callback: async (tokenResponse: any) => {
           if (tokenResponse.error) {
             console.error('Google OAuth error:', tokenResponse);
-            setError(`Google Sign-In: ${tokenResponse.error_description || tokenResponse.error}`);
+            setError(`Google Sign-In: ${tokenResponse.error_description || tokenResponse.error}. (Ensure https://team-management-server-pied.vercel.app is added to Authorized Origins in Google Cloud Console)`);
             setSocialLoading(false);
             return;
           }
