@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: hustlex-team-workspace-api
+    env: node
+    plan: free
+    rootDir: server
+    buildCommand: npm install && npx prisma generate && npm run build
+    startCommand: npm run start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        value: postgresql://neondb_owner:npg_g0hZqM3AomwW@ep-soft-shadow-aytc5lnq.c-5.us-east-2.aws.neon.tech/neondb?sslmode=require
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CORS_ORIGIN
+        value: "*"
+      - key: UPLOAD_DIR
+        value: ./uploads
