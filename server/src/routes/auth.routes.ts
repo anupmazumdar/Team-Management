@@ -88,7 +88,7 @@ authRouter.post('/login', async (req: Request, res: Response) => {
     }
 
     if (!user.passwordHash) {
-      return res.status(401).json({ error: 'This account signs in via Auth0. Please click "Continue with Auth0".' });
+      return res.status(401).json({ error: 'This account signs in via Google or GitHub. Please use social sign-in.' });
     }
 
     const isValid = await bcrypt.compare(password, user.passwordHash);

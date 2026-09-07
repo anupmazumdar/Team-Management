@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useAuth0 } from '@auth0/auth0-react';
-import { Layers, Shield, Lock, Mail, SlidersHorizontal, Loader2 } from 'lucide-react';
-import { Auth0Modal } from '../components/common/Auth0Modal';
+import { Layers, Lock, Mail, Loader2 } from 'lucide-react';
 import { SocialAuthModal, SocialProvider } from '../components/common/SocialAuthModal';
 
 interface LoginPageProps {
@@ -10,22 +8,15 @@ interface LoginPageProps {
 }
 
 export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
-  const { login, loginWithAuth0, loginWithSocial, loginWithGitHubCode } = useAuth();
-  const {
-    loginWithRedirect,
-    user: auth0User,
-    isAuthenticated: isAuth0Authenticated,
-  } = useAuth0();
+  const { login, loginWithSocial, loginWithGitHubCode } = useAuth();
 
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [emailLoading, setEmailLoading] = useState<boolean>(false);
-  const [auth0Loading, setAuth0Loading] = useState<boolean>(false);
   const [socialLoading, setSocialLoading] = useState<boolean>(false);
-  const isAnyLoading = emailLoading || auth0Loading || socialLoading;
+  const isAnyLoading = emailLoading || socialLoading;
 
   const [error, setError] = useState<string | null>(null);
-  const [showAuth0Modal, setShowAuth0Modal] = useState<boolean>(false);
   const [socialModalProvider, setSocialModalProvider] = useState<SocialProvider | null>(null);
 
   // Check for GitHub OAuth ?code= parameter on redirect
@@ -61,35 +52,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
     }
   };
 
-  // Sync Auth0 profile if returning from live Auth0 redirect
-  useEffect(() => {
-    if (isAuth0Authenticated && auth0User) {
-      handleAuth0Sync(auth0User);
-    }
-  }, [isAuth0Authenticated, auth0User]);
-
-  const handleAuth0Sync = async (userObj: any) => {
-    setAuth0Loading(true);
-    setError(null);
-    try {
-      await loginWithAuth0({
-        sub: userObj.sub,
-        email: userObj.email,
-        name: userObj.name || userObj.nickname,
-        picture: userObj.picture,
-      });
-      setShowAuth0Modal(false);
-    } catch (err: any) {
-      console.error('Auth0 backend sync error:', err);
-      if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
-        setError('Backend server request timed out. Render may be waking up, please try again.');
-      } else {
-        setError(err.response?.data?.error || err.response?.data?.details || err.message || 'Failed to sync Auth0 account with backend.');
-      }
-    } finally {
-      setAuth0Loading(false);
-    }
-  };
 
   const handleSocialSync = async (data: {
     provider: SocialProvider;
@@ -192,36 +154,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
     window.location.href = `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&scope=read:user,user:email&redirect_uri=${encodeURIComponent(redirectUri)}&state=github_oauth`;
   };
 
-  const handleAuth0Click = async () => {
-    setError(null);
-    const storedDomain = localStorage.getItem('hustlex_auth0_domain');
-    const storedClientId = localStorage.getItem('hustlex_auth0_client_id');
-    const envDomain = import.meta.env.VITE_AUTH0_DOMAIN;
-    const envClientId = import.meta.env.VITE_AUTH0_CLIENT_ID;
-
-    const hasRealDomain = (storedDomain && storedDomain.includes('.')) || (envDomain && envDomain.includes('.') && envDomain !== 'dev-hustlex.us.auth0.com');
-    const hasRealClientId = (storedClientId && storedClientId.length > 5) || (envClientId && envClientId.length > 5 && envClientId !== 'client-id-placeholder');
-
-    if (hasRealDomain && hasRealClientId) {
-      // Direct live Auth0 redirect
-      setAuth0Loading(true);
-      try {
-        await loginWithRedirect({
-          authorizationParams: {
-            redirect_uri: window.location.origin,
-          },
-        });
-      } catch (err: any) {
-        console.warn('Auth0 redirect error:', err);
-        setAuth0Loading(false);
-        setShowAuth0Modal(true);
-      }
-    } else {
-      // Open interactive Auth0 SSO drawer/modal with 1-click sync or tenant config
-      setShowAuth0Modal(true);
-    }
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setEmailLoading(true);
@@ -253,7 +185,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
         </div>
         <h2 className="text-2xl font-black text-white tracking-tight">HustleX Workspace</h2>
         <p className="mt-1 text-xs text-slate-400">
-          Enterprise task management • Auth0 SSO • Mission SLA verification
+          Enterprise task management • Real-time SLA tracking
         </p>
       </div>
 
@@ -265,43 +197,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
             </div>
           )}
 
-          {/* Auth0 Primary Single Sign-On Button */}
-          <div>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={handleAuth0Click}
-                disabled={isAnyLoading}
-                className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-orange-600 via-amber-600 to-indigo-600 hover:from-orange-500 hover:to-indigo-500 text-white text-xs font-bold shadow-lg shadow-amber-600/20 flex items-center justify-center gap-2.5 transition-all disabled:opacity-50 group"
-              >
-                {auth0Loading ? (
-                  <Loader2 className="w-4 h-4 text-white animate-spin" />
-                ) : (
-                  <Shield className="w-4 h-4 text-white group-hover:scale-110 transition-transform" />
-                )}
-                <span>{auth0Loading ? 'Authenticating with Auth0...' : 'Continue with Auth0 SSO'}</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowAuth0Modal(true)}
-                title="Configure Auth0 Tenant / Sandbox"
-                className="p-3 rounded-xl bg-slate-950 hover:bg-slate-800 text-slate-400 hover:text-orange-400 border border-slate-800 transition-colors"
-              >
-                <SlidersHorizontal className="w-4 h-4" />
-              </button>
-            </div>
-            <p className="text-[10px] text-slate-400 text-center mt-1.5 flex items-center justify-center gap-1.5">
-              <span>Secure OAuth 2.0 / OpenID Connect</span>
-              <span>•</span>
-              <button
-                type="button"
-                onClick={() => setShowAuth0Modal(true)}
-                className="text-orange-400 hover:underline font-semibold"
-              >
-                Configure / Instant Sync
-              </button>
-            </p>
-          </div>
 
           {/* Social Authenticators: Google & GitHub */}
           <div>
@@ -409,13 +304,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
         </div>
       </div>
 
-      {/* Auth0 SSO Modal */}
-      <Auth0Modal
-        isOpen={showAuth0Modal}
-        onClose={() => setShowAuth0Modal(false)}
-        onInstantAuth0Sync={handleAuth0Sync}
-        loading={auth0Loading}
-      />
 
       {/* Social Authenticator Modal (Google, GitHub) */}
       <SocialAuthModal

@@ -10,9 +10,8 @@ interface AuthContextType {
   activeRole: TeamRole | null;
   loading: boolean;
   login: (email: string, password?: string) => Promise<void>;
-  loginWithAuth0: (auth0User: { sub?: string; email?: string; name?: string; picture?: string }) => Promise<void>;
   loginWithSocial: (data: {
-    provider: 'google' | 'github' | 'auth0';
+    provider: 'google' | 'github';
     providerId: string;
     email: string;
     fullName: string;
@@ -97,32 +96,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const loginWithAuth0 = async (auth0User: { sub?: string; email?: string; name?: string; picture?: string }) => {
-    setLoading(true);
-    try {
-      const res = await api.post('/auth/auth0-sync', {
-        auth0Id: auth0User.sub,
-        email: auth0User.email,
-        fullName: auth0User.name,
-        avatarUrl: auth0User.picture,
-      });
-      const { token: newToken, user: newUser, teams: userTeams } = res.data;
-      localStorage.setItem('hustlex_token', newToken);
-      setToken(newToken);
-      setUser(newUser);
-      setTeams(userTeams || []);
-
-      if (userTeams?.length > 0) {
-        setActiveTeamId(userTeams[0].teamId);
-        localStorage.setItem('hustlex_active_team_id', userTeams[0].teamId);
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const loginWithSocial = async (data: {
-    provider: 'google' | 'github' | 'auth0';
+    provider: 'google' | 'github';
     providerId: string;
     email: string;
     fullName: string;
@@ -210,7 +185,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         activeRole,
         loading,
         login,
-        loginWithAuth0,
         loginWithSocial,
         loginWithGitHubCode,
         register,
