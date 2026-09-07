@@ -71,6 +71,60 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
     }
   };
 
+  const GOOGLE_CLIENT_ID =
+    import.meta.env.VITE_GOOGLE_CLIENT_ID ||
+    '612857418194-j68nke48tjglhvtdql05s8s7tfj4bhpe.apps.googleusercontent.com';
+
+  const handleGoogleRealSignIn = () => {
+    setError(null);
+    if (!window.google?.accounts?.oauth2) {
+      setError('Google Identity Services is initializing. Please click again in 1 second.');
+      return;
+    }
+    setLoading(true);
+    try {
+      const client = window.google.accounts.oauth2.initTokenClient({
+        client_id: GOOGLE_CLIENT_ID,
+        scope: 'openid email profile',
+        callback: async (tokenResponse: any) => {
+          if (tokenResponse.error) {
+            console.error('Google OAuth error:', tokenResponse);
+            setError(`Google Sign-In: ${tokenResponse.error_description || tokenResponse.error}`);
+            setLoading(false);
+            return;
+          }
+          if (tokenResponse.access_token) {
+            try {
+              // Fetch user profile from Google's standard UserInfo endpoint
+              const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+                headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
+              });
+              const profile = await userInfoRes.json();
+              await handleSocialSync({
+                provider: 'google',
+                providerId: `google|${profile.sub}`,
+                email: profile.email,
+                fullName: profile.name || profile.email.split('@')[0],
+                avatarUrl: profile.picture,
+                headline: 'Google Verified Member',
+              });
+            } catch (syncErr: any) {
+              console.error('Failed to sync Google user:', syncErr);
+              setError(syncErr.response?.data?.error || 'Failed to sync Google profile with database.');
+            } finally {
+              setLoading(false);
+            }
+          }
+        },
+      });
+      client.requestAccessToken();
+    } catch (err: any) {
+      console.error('Failed to initialize Google token client:', err);
+      setError('Could not open Google Sign-In popup. Please ensure popups are allowed in your browser.');
+      setLoading(false);
+    }
+  };
+
   const handleAuth0Click = async () => {
     setError(null);
     const storedDomain = localStorage.getItem('hustlex_auth0_domain');
@@ -190,7 +244,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
               {/* Google */}
               <button
                 type="button"
-                onClick={() => setSocialModalProvider('google')}
+                onClick={handleGoogleRealSignIn}
                 disabled={loading}
                 className="py-2 px-2 sm:px-3 rounded-xl bg-slate-950 hover:bg-slate-900 border border-slate-800 hover:border-slate-700 text-xs font-semibold text-slate-200 flex items-center justify-center gap-1.5 transition-all hover:scale-[1.02] shadow-sm group disabled:opacity-50"
                 title="Sign in with Google"
@@ -335,6 +389,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
         provider={socialModalProvider}
         onClose={() => setSocialModalProvider(null)}
         onSocialSync={handleSocialSync}
+        onRealGoogleSignIn={handleGoogleRealSignIn}
         loading={loading}
       />
     </div>
