@@ -1,0 +1,246 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  fullName     String   @map("full_name")
+  avatarUrl    String?  @map("avatar_url")
+  title        String?
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  teamMembers      TeamMember[]
+  createdTeams     Team[]         @relation("TeamCreator")
+  createdProjects  Project[]      @relation("ProjectCreator")
+  assignedTasks    Task[]         @relation("TaskAssignee")
+  createdTasks     Task[]         @relation("TaskCreator")
+  reviewedTasks    Task[]         @relation("TaskReviewer")
+  taskComments     TaskComment[]
+  taskReviews      TaskReview[]
+  messages         Message[]
+  notifications    Notification[]
+  activityLogs     ActivityLog[]
+  attachments      Attachment[]
+
+  @@map("users")
+}
+
+model Team {
+  id          String   @id @default(uuid())
+  name        String
+  slug        String   @unique
+  description String?
+  createdById String   @map("created_by")
+  createdBy   User     @relation("TeamCreator", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  members           TeamMember[]
+  projects          Project[]
+  tasks             Task[]
+  messages          Message[]
+  notifications     Notification[]
+  activityLogs      ActivityLog[]
+  internshipPeriods InternshipPeriod[]
+
+  @@map("teams")
+}
+
+model TeamMember {
+  id        String    @id @default(uuid())
+  teamId    String    @map("team_id")
+  team      Team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  userId    String    @map("user_id")
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      String    // 'admin' | 'lead' | 'member'
+  joinedAt  DateTime  @default(now()) @map("joined_at")
+  removedAt DateTime? @map("removed_at")
+
+  @@unique([teamId, userId])
+  @@index([teamId, userId])
+  @@map("team_members")
+}
+
+model Project {
+  id          String   @id @default(uuid())
+  teamId      String   @map("team_id")
+  team        Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  status      String   @default("active") // 'active' | 'archived' | 'completed'
+  createdById String   @map("created_by")
+  createdBy   User     @relation("ProjectCreator", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  tasks        Task[]
+  messages     Message[]
+  activityLogs ActivityLog[]
+
+  @@map("projects")
+}
+
+model Task {
+  id             String    @id @default(uuid())
+  projectId      String    @map("project_id")
+  project        Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  teamId         String    @map("team_id")
+  team           Team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  title          String
+  description    String
+  status         String    @default("NOT_STARTED") // NOT_STARTED, IN_PROGRESS, SUBMITTED, UNDER_REVIEW, APPROVED, CHANGES_REQUIRED
+  priority       String    @default("MEDIUM")      // LOW, MEDIUM, HIGH, URGENT
+  category       String    @default("General")     // Frontend, Backend, QA, Design, DevOps, General
+  deadline       DateTime?
+  assignedToId   String?   @map("assigned_to")
+  assignedTo     User?     @relation("TaskAssignee", fields: [assignedToId], references: [id])
+  reviewerId     String?   @map("reviewer_id")
+  reviewer       User?     @relation("TaskReviewer", fields: [reviewerId], references: [id])
+  createdById    String    @map("created_by")
+  createdBy      User      @relation("TaskCreator", fields: [createdById], references: [id])
+  checklist      Json      @default("[]")          // [{ id, text, completed }]
+  submissionNote String?   @map("submission_note")
+  missionDetails String?   @map("mission_details")
+  acceptedAt     DateTime? @map("accepted_at")
+  acceptedById   String?   @map("accepted_by_id")
+  deliveredAt    DateTime? @map("delivered_at")
+  isOnTime       Boolean?  @map("is_on_time")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  comments     TaskComment[]
+  reviews      TaskReview[]
+  attachments  Attachment[]
+  activityLogs ActivityLog[]
+
+  @@index([teamId, status])
+  @@index([projectId])
+  @@index([assignedToId])
+  @@map("tasks")
+}
+
+model TaskComment {
+  id        String   @id @default(uuid())
+  taskId    String   @map("task_id")
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  content   String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("task_comments")
+}
+
+model TaskReview {
+  id                     String   @id @default(uuid())
+  taskId                 String   @map("task_id")
+  task                   Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  reviewedByUserId       String   @map("reviewed_by_user_id")
+  reviewedByUser         User     @relation(fields: [reviewedByUserId], references: [id])
+  reviewedByNameSnapshot String   @map("reviewed_by_name_snapshot")
+  reviewedByRoleSnapshot String   @map("reviewed_by_role_snapshot")
+  decision               String   // 'APPROVED' | 'CHANGES_REQUIRED'
+  comment                String
+  timestamp              DateTime @default(now())
+
+  @@index([taskId])
+  @@map("task_reviews")
+}
+
+model Attachment {
+  id         String   @id @default(uuid())
+  taskId     String?  @map("task_id")
+  task       Task?    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  messageId  String?  @map("message_id")
+  message    Message? @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  uploaderId String   @map("uploader_id")
+  uploader   User     @relation(fields: [uploaderId], references: [id])
+  fileName   String   @map("file_name")
+  fileUrl    String   @map("file_url")
+  fileSize   Int      @map("file_size")
+  mimeType   String   @map("mime_type")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@map("attachments")
+}
+
+model Message {
+  id        String   @id @default(uuid())
+  projectId String   @map("project_id")
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  teamId    String   @map("team_id")
+  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  senderId  String?  @map("sender_id")
+  sender    User?    @relation(fields: [senderId], references: [id])
+  content   String
+  isSystem  Boolean  @default(false) @map("is_system")
+  mentions  Json     @default("[]")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  attachments Attachment[]
+
+  @@index([projectId, createdAt])
+  @@map("messages")
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  teamId    String   @map("team_id")
+  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  type      String   // TASK_ASSIGNED, TASK_SUBMITTED, TASK_APPROVED, CHANGES_REQUESTED, MENTION, DEADLINE_APPROACHING, NEW_MESSAGE, ROLE_CHANGED
+  title     String
+  message   String
+  link      String?
+  isRead    Boolean  @default(false) @map("is_read")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId, isRead])
+  @@map("notifications")
+}
+
+model ActivityLog {
+  id        String   @id @default(uuid())
+  teamId    String   @map("team_id")
+  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  projectId String?  @map("project_id")
+  project   Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  taskId    String?  @map("task_id")
+  task      Task?    @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  actorId   String   @map("actor_id")
+  actor     User     @relation(fields: [actorId], references: [id])
+  action    String   // TASK_CREATED, STATUS_CHANGED, REVIEW_SUBMITTED, ROLE_UPDATED, MEMBER_REMOVED, etc.
+  details   Json     @default("{}")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([teamId, createdAt])
+  @@map("activity_logs")
+}
+
+model InternshipPeriod {
+  id                   String   @id @default(uuid())
+  teamId               String   @map("team_id")
+  team                 Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  monthNumber          Int      @map("month_number") // 1 to 6
+  monthTitle           String   @map("month_title")
+  startDate            DateTime @map("start_date")
+  endDate              DateTime @map("end_date")
+  milestones           Json     @default("[]")       // [{ id, title, completed, dueDate }]
+  completionPercentage Int      @default(0) @map("completion_percentage")
+  status               String   @default("UPCOMING") // UPCOMING, IN_PROGRESS, COMPLETED
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  @@unique([teamId, monthNumber])
+  @@map("internship_periods")
+}

@@ -1,0 +1,69 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+  }
+
+  body {
+    @apply bg-slate-950 text-slate-100 antialiased min-h-screen selection:bg-indigo-500 selection:text-white;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
+/* Glassmorphism effects */
+.glass-panel {
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.glass-card {
+  background: rgba(30, 41, 59, 0.6);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.glass-card:hover {
+  border-color: rgba(99, 102, 241, 0.3);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+}
+
+/* Status Badges */
+.badge-not-started {
+  @apply bg-slate-800/80 text-slate-300 border border-slate-700/60;
+}
+.badge-in-progress {
+  @apply bg-blue-950/60 text-blue-400 border border-blue-800/60;
+}
+.badge-submitted {
+  @apply bg-purple-950/60 text-purple-300 border border-purple-800/60 animate-pulse;
+}
+.badge-under-review {
+  @apply bg-amber-950/60 text-amber-300 border border-amber-700/60;
+}
+.badge-approved {
+  @apply bg-emerald-950/60 text-emerald-400 border border-emerald-800/60;
+}
+.badge-changes-required {
+  @apply bg-rose-950/60 text-rose-400 border border-rose-800/60;
+}

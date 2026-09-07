@@ -1,0 +1,18 @@
+{
+  "version": 2,
+  "buildCommand": "npm run vercel-build",
+  "outputDirectory": "client/dist",
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
+    }
+  ],
+  "env": {
+    "NODE_ENV": "production"
+  }
+}

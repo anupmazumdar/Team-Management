@@ -1,0 +1,24 @@
+{
+  "name": "hustlex-team-workspace",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Hustlex Team Workspace - Full-Stack Task Verification, Real-Time Collaboration & Internship Tracking",
+  "workspaces": [
+    "server",
+    "client"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev --prefix server\" \"npm run dev --prefix client\"",
+    "dev:server": "npm run dev --prefix server",
+    "dev:client": "npm run dev --prefix client",
+    "build": "npm run build --prefix server && npm run build --prefix client",
+    "vercel-build": "prisma generate --schema=server/prisma/schema.prisma && npm run build --prefix client",
+    "postinstall": "prisma generate --schema=server/prisma/schema.prisma",
+    "seed": "npm run prisma:seed --prefix server",
+    "test:state-machine": "npm run test:state-machine --prefix server"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "prisma": "^6.4.1"
+  }
+}
