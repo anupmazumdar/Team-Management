@@ -17,9 +17,29 @@ interface SocketUser {
 }
 
 export function initSocketIO(httpServer: HTTPServer) {
+  const rawOrigins = [
+    ENV.CLIENT_URL,
+    ...(process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',').map((o) => o.trim()) : []),
+    'https://team-management-client-ten.vercel.app',
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'http://127.0.0.1:5173',
+  ];
+  const allowedOrigins = Array.from(new Set(rawOrigins.filter(Boolean)));
+
   io = new SocketIOServer(httpServer, {
     cors: {
-      origin: '*',
+      origin: (origin, callback) => {
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
+          return callback(null, true);
+        }
+        if (/^https:\/\/team-management.*\.vercel\.app$/.test(origin)) {
+          return callback(null, true);
+        }
+        return callback(new Error(`Socket origin ${origin} not allowed by CORS`));
+      },
+      credentials: true,
       methods: ['GET', 'POST'],
     },
   });

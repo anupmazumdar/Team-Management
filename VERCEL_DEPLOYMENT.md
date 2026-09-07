@@ -4,17 +4,17 @@ This guide explains how to deploy the **Vite React Frontend** to **Vercel** with
 
 ---
 
-## ⚡ Recommended Setup: Root Directory = `client`
+## ⚡ Recommended Setup: Root Directory = Repository Root (`./`)
 
 ### Step 1: Import Repository
 1. Go to [vercel.com](https://vercel.com) and click **"Add New..."** → **"Project"**.
 2. Select your repository **`anupmazumdar/Team-Management`**.
 
 ### Step 2: Configure Build & Root Directory
-- **Framework Preset**: `Vite`
-- **Root Directory**: Click "Edit" and select **`client`**
-- **Build Command**: `npm run build` (auto-detected)
-- **Output Directory**: `dist` (auto-detected)
+- **Root Directory**: `./` (Leave as repository root — do **NOT** change to `client/`). The repository uses a consolidated root `vercel.json` as the single source of truth.
+- **Framework Preset**: `Vite` (or `Other`)
+- **Build Command**: Automatically provided by root `vercel.json`: `npm run build --prefix client`
+- **Output Directory**: Automatically provided by root `vercel.json`: `client/dist`
 
 ### Step 3: Add Environment Variables
 Under **Environment Variables**, configure:
@@ -27,8 +27,8 @@ Under **Environment Variables**, configure:
 | `VITE_AUTH0_CLIENT_ID` | `your-auth0-client-id` | (Optional) Auth0 SPA Client ID |
 
 ### Step 4: Deploy
-Click **"Deploy"**. Vercel will install dependencies and compile the production bundle.
-`client/vercel.json` provides the necessary client-side SPA rewrites (`/(.*) -> /index.html`) so routing works seamlessly without 404s.
+Click **"Deploy"**. Vercel will run the build command from root and deploy the compiled `client/dist` bundle.
+The root `vercel.json` provides the necessary client-side SPA rewrites (`/(.*) -> /index.html`) so routing works seamlessly without 404s.
 
 ---
 

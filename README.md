@@ -82,20 +82,23 @@ npm install
 ```
 
 ### 2. Configure Environment Variables
-Copy `.env.example` in the `server` directory:
+Copy `.env.example` to `.env` in the `server` directory:
 ```bash
 cp server/.env.example server/.env
 ```
 
-Configure `server/.env`:
+Configure `server/.env` with your actual credentials (see `.env.example` for required variable names):
 ```ini
-PORT=5000
-DATABASE_URL="postgresql://username:password@ep-your-database-host.neon.tech/neondb?sslmode=require"
-JWT_SECRET="your-secure-jwt-secret-key-min-32-chars"
-JWT_EXPIRES_IN="7d"
-CLIENT_URL="http://localhost:5173"
-UPLOAD_DIR="./uploads"
+PORT=
+DATABASE_URL=
+JWT_SECRET=
+JWT_EXPIRES_IN=
+CLIENT_URL=
+UPLOAD_DIR=
+CORS_ORIGIN=
 ```
+
+> **Security Note**: Never commit actual credentials to git. If database credentials or JWT secrets were ever previously committed in git history, rotate them immediately in Neon and generate a new JWT secret.
 
 ### 3. Initialize & Seed Database
 ```bash

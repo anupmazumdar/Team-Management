@@ -12,11 +12,11 @@ This guide walks you through deploying **Hustlex Team Workspace** with:
 - **GitHub Repository**: [https://github.com/anupmazumdar/Team-Management](https://github.com/anupmazumdar/Team-Management)
 - **Database (PostgreSQL)**: Neon Serverless PostgreSQL, Supabase, or self-hosted
   ```
-  DATABASE_URL="postgresql://username:password@ep-your-database-host.neon.tech/neondb?sslmode=require"
+  DATABASE_URL=
   ```
-- **JWT Secret Key**: Random 32+ character string for token signing
+- **JWT Secret Key**: Random 32+ character string for token signing (Never commit secrets)
   ```
-  JWT_SECRET="your-secure-jwt-secret-key-min-32-chars"
+  JWT_SECRET=
   ```
 
 ---
@@ -56,9 +56,10 @@ If you prefer creating the Web Service manually:
    | Key | Value | Description |
    |---|---|---|
    | `NODE_ENV` | `production` | Production mode |
-   | `DATABASE_URL` | `postgresql://username:password@ep-host.neon.tech/neondb?sslmode=require` | Your Neon DB connection string |
-   | `JWT_SECRET` | `your-secure-jwt-secret-key-min-32-chars` | Secure signing secret |
-   | `CORS_ORIGIN` | `*` | Allowed CORS origins |
+   | `DATABASE_URL` | `<Your live Neon DB connection string>` | Secure connection string from Neon dashboard |
+   | `JWT_SECRET` | `<Your random 32+ character string>` | Strong cryptographic signing secret |
+   | `CLIENT_URL` | `https://your-frontend.vercel.app` | Allowed client URL |
+   | `CORS_ORIGIN` | `https://your-frontend.vercel.app` | Allowed CORS origin |
    | `UPLOAD_DIR` | `./uploads` | Local upload directory fallback |
 
 5. Click **"Create Web Service"**.
@@ -74,8 +75,10 @@ If you prefer creating the Web Service manually:
 2. Click **"Add New..."** → **"Project"**.
 3. Import the repository **`anupmazumdar/Team-Management`**.
 4. In the **Configure Project** screen:
-   - **Framework Preset**: `Vite`
-   - **Root Directory**: Click "Edit" and select **`client`**
+   - **Root Directory**: `./` (Leave as default repository root — do **NOT** change to `client/`). The single root `vercel.json` serves as the source of truth, building via `npm run build --prefix client` and deploying `client/dist`.
+   - **Framework Preset**: `Vite` (or `Other`)
+   - **Build Command**: Automatically provided by root `vercel.json` (`npm run build --prefix client`)
+   - **Output Directory**: Automatically provided by root `vercel.json` (`client/dist`)
 5. Expand **Environment Variables** and add:
 
    | Key | Value | Note |

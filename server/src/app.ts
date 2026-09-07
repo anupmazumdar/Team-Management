@@ -13,16 +13,59 @@ import { notificationRouter } from './routes/notification.routes.js';
 import { uploadRouter } from './routes/upload.routes.js';
 import { exportRouter } from './routes/export.routes.js';
 
+import { ENV } from './config/env.js';
+
 export const app = express();
 
+// Allowed CORS origins
+const rawOrigins = [
+  ENV.CLIENT_URL,
+  ...(process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',').map((o) => o.trim()) : []),
+  'https://team-management-client-ten.vercel.app',
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'http://127.0.0.1:5173',
+];
+const allowedOrigins = Array.from(new Set(rawOrigins.filter(Boolean)));
+
 // Middleware
-app.use(cors({ origin: '*' }));
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow requests with no origin (such as mobile apps, curl, or server-to-server)
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
+        return callback(null, true);
+      }
+
+      // Allow Vercel preview/production deployments for team-management
+      if (/^https:\/\/team-management.*\.vercel\.app$/.test(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error(`Origin ${origin} not allowed by CORS policy`));
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  })
+);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Serve uploaded files statically if local
+
+// Serve uploaded files statically with security headers (download attachment, nosniff)
 const uploadsPath = path.resolve(process.cwd(), 'uploads');
-app.use('/uploads', express.static(uploadsPath));
+app.use(
+  '/uploads',
+  express.static(uploadsPath, {
+    setHeaders: (res) => {
+      res.setHeader('Content-Disposition', 'attachment');
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+    },
+  })
+);
 
 // API Routes
 app.use('/api/auth', authRouter);
