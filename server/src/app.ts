@@ -39,16 +39,16 @@ app.use(
         return callback(null, true);
       }
 
-      // Allow Vercel preview/production deployments for team-management
-      if (/^https:\/\/team-management.*\.vercel\.app$/.test(origin)) {
+      // Allow all Vercel deployments (production, preview, branch)
+      if (/^https:\/\/[a-z0-9-]+\.vercel\.app$/.test(origin)) {
         return callback(null, true);
       }
 
-      return callback(new Error(`Origin ${origin} not allowed by CORS policy`));
+      return callback(null, false);
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'x-team-id', 'Accept'],
   })
 );
 app.use(express.json());

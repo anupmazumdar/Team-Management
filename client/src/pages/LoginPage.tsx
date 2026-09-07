@@ -19,7 +19,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
 
   const [email, setEmail] = useState<string>('admin@hustlex.com');
   const [password, setPassword] = useState<string>('Password123!');
-  const [loading, setLoading] = useState<boolean>(false);
+  const [emailLoading, setEmailLoading] = useState<boolean>(false);
+  const [auth0Loading, setAuth0Loading] = useState<boolean>(false);
+  const [socialLoading, setSocialLoading] = useState<boolean>(false);
+  const isAnyLoading = emailLoading || auth0Loading || socialLoading;
+
   const [error, setError] = useState<string | null>(null);
   const [showAuth0Modal, setShowAuth0Modal] = useState<boolean>(false);
   const [socialModalProvider, setSocialModalProvider] = useState<SocialProvider | null>(null);
@@ -32,7 +36,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
   }, [isAuth0Authenticated, auth0User]);
 
   const handleAuth0Sync = async (userObj: any) => {
-    setLoading(true);
+    setAuth0Loading(true);
     setError(null);
     try {
       await loginWithAuth0({
@@ -44,9 +48,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
       setShowAuth0Modal(false);
     } catch (err: any) {
       console.error('Auth0 backend sync error:', err);
-      setError(err.response?.data?.error || err.response?.data?.details || 'Failed to sync Auth0 account with backend.');
+      if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
+        setError('Backend server request timed out. Render may be waking up, please try again.');
+      } else {
+        setError(err.response?.data?.error || err.response?.data?.details || err.message || 'Failed to sync Auth0 account with backend.');
+      }
     } finally {
-      setLoading(false);
+      setAuth0Loading(false);
     }
   };
 
@@ -58,16 +66,20 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
     avatarUrl?: string;
     headline?: string;
   }) => {
-    setLoading(true);
+    setSocialLoading(true);
     setError(null);
     try {
       await loginWithSocial(data);
       setSocialModalProvider(null);
     } catch (err: any) {
       console.error('Social OAuth sync error:', err);
-      setError(err.response?.data?.error || err.response?.data?.details || 'Failed to authenticate with social provider.');
+      if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
+        setError('Backend server request timed out. Render may be waking up, please try again.');
+      } else {
+        setError(err.response?.data?.error || err.response?.data?.details || err.message || 'Failed to authenticate with social provider.');
+      }
     } finally {
-      setLoading(false);
+      setSocialLoading(false);
     }
   };
 
@@ -81,7 +93,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
       setError('Google Identity Services is initializing. Please click again in 1 second.');
       return;
     }
-    setLoading(true);
+    setSocialLoading(true);
     try {
       const client = window.google.accounts.oauth2.initTokenClient({
         client_id: GOOGLE_CLIENT_ID,
@@ -90,7 +102,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
           if (tokenResponse.error) {
             console.error('Google OAuth error:', tokenResponse);
             setError(`Google Sign-In: ${tokenResponse.error_description || tokenResponse.error}`);
-            setLoading(false);
+            setSocialLoading(false);
             return;
           }
           if (tokenResponse.access_token) {
@@ -110,9 +122,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
               });
             } catch (syncErr: any) {
               console.error('Failed to sync Google user:', syncErr);
-              setError(syncErr.response?.data?.error || 'Failed to sync Google profile with database.');
+              if (syncErr.code === 'ECONNABORTED' || syncErr.message?.includes('timeout')) {
+                setError('Request timed out connecting to backend server. Render may be waking up.');
+              } else {
+                setError(syncErr.response?.data?.error || syncErr.response?.data?.details || syncErr.message || 'Failed to sync Google profile with database.');
+              }
             } finally {
-              setLoading(false);
+              setSocialLoading(false);
             }
           }
         },
@@ -121,7 +137,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
     } catch (err: any) {
       console.error('Failed to initialize Google token client:', err);
       setError('Could not open Google Sign-In popup. Please ensure popups are allowed in your browser.');
-      setLoading(false);
+      setSocialLoading(false);
     }
   };
 
@@ -137,7 +153,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
 
     if (hasRealDomain && hasRealClientId) {
       // Direct live Auth0 redirect
-      setLoading(true);
+      setAuth0Loading(true);
       try {
         await loginWithRedirect({
           authorizationParams: {
@@ -146,7 +162,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
         });
       } catch (err: any) {
         console.warn('Auth0 redirect error:', err);
-        setLoading(false);
+        setAuth0Loading(false);
         setShowAuth0Modal(true);
       }
     } else {
@@ -157,15 +173,21 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    setEmailLoading(true);
     setError(null);
     try {
       await login(email, password);
     } catch (err: any) {
       console.error(err);
-      setError(err.response?.data?.error || err.response?.data?.details || 'Failed to login');
+      if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
+        setError('Backend server request timed out (20s). Render backend is waking up or database is connecting. Please wait 10 seconds and try again.');
+      } else if (!err.response) {
+        setError('Cannot connect to backend server. Render may be waking up from sleep. Please try again in a few moments.');
+      } else {
+        setError(err.response?.data?.error || err.response?.data?.details || err.message || 'Failed to login');
+      }
     } finally {
-      setLoading(false);
+      setEmailLoading(false);
     }
   };
 
@@ -203,15 +225,15 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
               <button
                 type="button"
                 onClick={handleAuth0Click}
-                disabled={loading}
+                disabled={isAnyLoading}
                 className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-orange-600 via-amber-600 to-indigo-600 hover:from-orange-500 hover:to-indigo-500 text-white text-xs font-bold shadow-lg shadow-amber-600/20 flex items-center justify-center gap-2.5 transition-all disabled:opacity-50 group"
               >
-                {loading ? (
+                {auth0Loading ? (
                   <Loader2 className="w-4 h-4 text-white animate-spin" />
                 ) : (
                   <Shield className="w-4 h-4 text-white group-hover:scale-110 transition-transform" />
                 )}
-                <span>{loading ? 'Authenticating...' : 'Continue with Auth0 SSO'}</span>
+                <span>{auth0Loading ? 'Authenticating with Auth0...' : 'Continue with Auth0 SSO'}</span>
               </button>
               <button
                 type="button"
@@ -245,7 +267,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
               <button
                 type="button"
                 onClick={handleGoogleRealSignIn}
-                disabled={loading}
+                disabled={isAnyLoading}
                 className="py-2 px-2 sm:px-3 rounded-xl bg-slate-950 hover:bg-slate-900 border border-slate-800 hover:border-slate-700 text-xs font-semibold text-slate-200 flex items-center justify-center gap-1.5 transition-all hover:scale-[1.02] shadow-sm group disabled:opacity-50"
                 title="Sign in with Google"
               >
@@ -262,7 +284,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
               <button
                 type="button"
                 onClick={() => setSocialModalProvider('github')}
-                disabled={loading}
+                disabled={isAnyLoading}
                 className="py-2 px-2 sm:px-3 rounded-xl bg-slate-950 hover:bg-slate-900 border border-slate-800 hover:border-slate-700 text-xs font-semibold text-slate-200 flex items-center justify-center gap-1.5 transition-all hover:scale-[1.02] shadow-sm group disabled:opacity-50"
                 title="Sign in with GitHub"
               >
@@ -276,7 +298,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
               <button
                 type="button"
                 onClick={() => setSocialModalProvider('linkedin')}
-                disabled={loading}
+                disabled={isAnyLoading}
                 className="py-2 px-2 sm:px-3 rounded-xl bg-slate-950 hover:bg-slate-900 border border-slate-800 hover:border-slate-700 text-xs font-semibold text-slate-200 flex items-center justify-center gap-1.5 transition-all hover:scale-[1.02] shadow-sm group disabled:opacity-50"
                 title="Sign in with LinkedIn"
               >
@@ -327,10 +349,17 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
 
             <button
               type="submit"
-              disabled={loading}
-              className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-600/30 transition-all disabled:opacity-50 mt-2"
+              disabled={isAnyLoading}
+              className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-600/30 transition-all disabled:opacity-50 mt-2 flex items-center justify-center gap-2"
             >
-              {loading ? 'Authenticating...' : 'Sign in'}
+              {emailLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 text-white animate-spin" />
+                  <span>Authenticating...</span>
+                </>
+              ) : (
+                <span>Sign in</span>
+              )}
             </button>
           </form>
 
@@ -380,7 +409,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
         isOpen={showAuth0Modal}
         onClose={() => setShowAuth0Modal(false)}
         onInstantAuth0Sync={handleAuth0Sync}
-        loading={loading}
+        loading={auth0Loading}
       />
 
       {/* Social Authenticator Modal (Google, GitHub, LinkedIn) */}
@@ -390,7 +419,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
         onClose={() => setSocialModalProvider(null)}
         onSocialSync={handleSocialSync}
         onRealGoogleSignIn={handleGoogleRealSignIn}
-        loading={loading}
+        loading={socialLoading}
       />
     </div>
   );
