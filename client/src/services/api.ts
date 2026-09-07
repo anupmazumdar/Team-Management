@@ -1,6 +1,12 @@
 import axios from 'axios';
 
-const apiBase = import.meta.env.VITE_API_URL || '/api';
+// In development, default to local proxy '/api'.
+// In production, default to the live Render backend if VITE_API_URL is not set.
+const defaultApiUrl = import.meta.env.DEV
+  ? '/api'
+  : 'https://hustlex-team-workspace-api.onrender.com/api';
+
+const apiBase = import.meta.env.VITE_API_URL || defaultApiUrl;
 
 export const api = axios.create({
   baseURL: apiBase,

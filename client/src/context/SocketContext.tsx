@@ -27,7 +27,10 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       return;
     }
 
-    const wsUrl = import.meta.env.VITE_WS_URL || '/';
+    const defaultWsUrl = import.meta.env.DEV
+      ? '/'
+      : 'https://hustlex-team-workspace-api.onrender.com';
+    const wsUrl = import.meta.env.VITE_WS_URL || defaultWsUrl;
     const newSocket = io(wsUrl, {
       auth: { token },
       transports: ['websocket', 'polling'],

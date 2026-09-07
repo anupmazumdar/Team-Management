@@ -111,9 +111,9 @@ authRouter.post('/login', async (req: Request, res: Response) => {
         joinedAt: tm.joinedAt,
       })),
     });
-  } catch (err) {
+  } catch (err: any) {
     console.error('Login error:', err);
-    return res.status(500).json({ error: 'Failed to login.' });
+    return res.status(500).json({ error: 'Failed to login.', details: err?.message || String(err) });
   }
 });
 

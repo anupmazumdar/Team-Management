@@ -12,7 +12,7 @@ This guide walks you through deploying **Hustlex Team Workspace** with:
 - **GitHub Repository**: [https://github.com/anupmazumdar/Team-Management](https://github.com/anupmazumdar/Team-Management)
 - **Database (Neon PostgreSQL)**: Already provisioned and seeded!
   ```
-  DATABASE_URL="postgresql://neondb_owner:npg_g0hZqM3AomwW@ep-soft-shadow-aytc5lnq.c-5.us-east-2.aws.neon.tech/neondb?sslmode=require"
+  DATABASE_URL="postgresql://neondb_owner:npg_lZXVUqsjMg93@ep-soft-shadow-aytc5lnq.c-5.us-east-2.aws.neon.tech/neondb?sslmode=require"
   ```
 - **JWT Secret Key**:
   ```
