@@ -415,6 +415,188 @@ authRouter.post('/social-sync', async (req: Request, res: Response) => {
   }
 });
 
+// GitHub OAuth Code Exchange & Account Sync
+authRouter.post('/github-exchange', async (req: Request, res: Response) => {
+  try {
+    const { code } = req.body;
+    if (!code) {
+      return res.status(400).json({ error: 'GitHub authorization code is required.' });
+    }
+
+    const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID || 'Ov23livtqhYLVsxl5EUM';
+    const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET;
+
+    if (!GITHUB_CLIENT_SECRET) {
+      return res.status(400).json({
+        error: 'GITHUB_CLIENT_SECRET is missing. Please add GITHUB_CLIENT_SECRET in your Render backend environment variables.',
+      });
+    }
+
+    // Exchange authorization code for GitHub access token
+    const tokenRes = await fetch('https://github.com/login/oauth/access_token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify({
+        client_id: GITHUB_CLIENT_ID,
+        client_secret: GITHUB_CLIENT_SECRET,
+        code,
+      }),
+    });
+
+    const tokenData: any = await tokenRes.json();
+    if (tokenData.error || !tokenData.access_token) {
+      console.error('GitHub token exchange error:', tokenData);
+      return res.status(400).json({
+        error: tokenData.error_description || tokenData.error || 'Failed to exchange GitHub authorization code.',
+      });
+    }
+
+    // Fetch user details from GitHub
+    const ghUserRes = await fetch('https://api.github.com/user', {
+      headers: {
+        Authorization: `Bearer ${tokenData.access_token}`,
+        'User-Agent': 'HustleX-Team-Workspace',
+      },
+    });
+    const ghUser: any = await ghUserRes.json();
+
+    // Fetch email if private
+    let email = ghUser.email;
+    if (!email) {
+      try {
+        const emailsRes = await fetch('https://api.github.com/user/emails', {
+          headers: {
+            Authorization: `Bearer ${tokenData.access_token}`,
+            'User-Agent': 'HustleX-Team-Workspace',
+          },
+        });
+        const emails: any[] = (await emailsRes.json()) as any[];
+        if (Array.isArray(emails)) {
+          const primary = emails.find((e: any) => e.primary && e.verified) || emails[0];
+          if (primary) email = primary.email;
+        }
+      } catch (err) {
+        console.warn('Could not fetch user emails from GitHub:', err);
+      }
+    }
+
+    if (!email) {
+      email = `${ghUser.login}@users.noreply.github.com`;
+    }
+
+    const cleanEmail = email.toLowerCase().trim();
+    const fullName = ghUser.name || ghUser.login || 'GitHub Developer';
+    const avatarUrl = ghUser.avatar_url;
+    const providerId = `github|${ghUser.id}`;
+
+    // Sync into PostgreSQL
+    let user = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { email: cleanEmail },
+          { auth0Id: providerId },
+        ],
+      },
+      include: {
+        teamMembers: {
+          where: { removedAt: null },
+          include: { team: true },
+        },
+      },
+    });
+
+    if (user) {
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          fullName: fullName || user.fullName,
+          avatarUrl: avatarUrl || user.avatarUrl,
+          authProvider: 'github',
+          auth0Id: providerId,
+        },
+        include: {
+          teamMembers: {
+            where: { removedAt: null },
+            include: { team: true },
+          },
+        },
+      });
+    } else {
+      const primaryTeam = await prisma.team.findFirst({
+        orderBy: { createdAt: 'asc' },
+      });
+
+      user = await prisma.user.create({
+        data: {
+          email: cleanEmail,
+          fullName,
+          avatarUrl,
+          title: ghUser.bio || 'GitHub Developer',
+          auth0Id: providerId,
+          authProvider: 'github',
+        },
+        include: {
+          teamMembers: {
+            where: { removedAt: null },
+            include: { team: true },
+          },
+        },
+      });
+
+      if (primaryTeam) {
+        await prisma.teamMember.create({
+          data: {
+            teamId: primaryTeam.id,
+            userId: user.id,
+            role: cleanEmail === 'admin@hustlex.com' ? 'admin' : 'member',
+          },
+        });
+
+        user = await prisma.user.findUnique({
+          where: { id: user.id },
+          include: {
+            teamMembers: {
+              where: { removedAt: null },
+              include: { team: true },
+            },
+          },
+        }) as any;
+      }
+    }
+
+    const token = jwt.sign(
+      { id: user!.id, email: user!.email, fullName: user!.fullName },
+      ENV.JWT_SECRET,
+      { expiresIn: ENV.JWT_EXPIRES_IN as any }
+    );
+
+    return res.json({
+      token,
+      user: {
+        id: user!.id,
+        email: user!.email,
+        fullName: user!.fullName,
+        title: user!.title,
+        avatarUrl: user!.avatarUrl,
+        authProvider: user!.authProvider,
+      },
+      teams: (user!.teamMembers || []).map((tm: any) => ({
+        teamId: tm.teamId,
+        teamName: tm.team.name,
+        teamSlug: tm.team.slug,
+        role: tm.role,
+        joinedAt: tm.joinedAt,
+      })),
+    });
+  } catch (err: any) {
+    console.error('GitHub exchange error:', err);
+    return res.status(500).json({ error: 'Failed to complete GitHub sign-in.', details: err?.message || String(err) });
+  }
+});
+
 // Get current authenticated user profile + dynamic teams & current roles
 authRouter.get('/me', authenticateToken, async (req: Request, res: Response) => {
   try {

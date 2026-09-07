@@ -12,13 +12,14 @@ interface AuthContextType {
   login: (email: string, password?: string) => Promise<void>;
   loginWithAuth0: (auth0User: { sub?: string; email?: string; name?: string; picture?: string }) => Promise<void>;
   loginWithSocial: (data: {
-    provider: 'google' | 'github' | 'linkedin' | 'auth0';
+    provider: 'google' | 'github' | 'auth0';
     providerId: string;
     email: string;
     fullName: string;
     avatarUrl?: string;
     headline?: string;
   }) => Promise<void>;
+  loginWithGitHubCode: (code: string) => Promise<void>;
   register: (data: { email: string; password: string; fullName: string; title?: string }) => Promise<void>;
   logout: () => void;
   switchTeam: (teamId: string) => void;
@@ -121,7 +122,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const loginWithSocial = async (data: {
-    provider: 'google' | 'github' | 'linkedin' | 'auth0';
+    provider: 'google' | 'github' | 'auth0';
     providerId: string;
     email: string;
     fullName: string;
@@ -131,6 +132,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(true);
     try {
       const res = await api.post('/auth/social-sync', data);
+      const { token: newToken, user: newUser, teams: userTeams } = res.data;
+      localStorage.setItem('hustlex_token', newToken);
+      setToken(newToken);
+      setUser(newUser);
+      setTeams(userTeams || []);
+
+      if (userTeams?.length > 0) {
+        setActiveTeamId(userTeams[0].teamId);
+        localStorage.setItem('hustlex_active_team_id', userTeams[0].teamId);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loginWithGitHubCode = async (code: string) => {
+    setLoading(true);
+    try {
+      const res = await api.post('/auth/github-exchange', { code });
       const { token: newToken, user: newUser, teams: userTeams } = res.data;
       localStorage.setItem('hustlex_token', newToken);
       setToken(newToken);
@@ -192,6 +212,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         login,
         loginWithAuth0,
         loginWithSocial,
+        loginWithGitHubCode,
         register,
         logout,
         switchTeam,
