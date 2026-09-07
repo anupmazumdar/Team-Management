@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useAuth0 } from '@auth0/auth0-react';
-import { Layers, Shield, Sparkles, Lock, Mail } from 'lucide-react';
+import { Layers, Shield, Sparkles, Lock, Mail, SlidersHorizontal, Loader2 } from 'lucide-react';
+import { Auth0Modal } from '../components/common/Auth0Modal';
 
 interface LoginPageProps {
   onGoToRegister: () => void;
@@ -10,19 +11,18 @@ interface LoginPageProps {
 export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
   const { login, loginWithAuth0 } = useAuth();
   const {
-    loginWithPopup,
     loginWithRedirect,
     user: auth0User,
     isAuthenticated: isAuth0Authenticated,
-    isLoading: isAuth0Loading,
   } = useAuth0();
 
   const [email, setEmail] = useState<string>('admin@hustlex.com');
   const [password, setPassword] = useState<string>('Password123!');
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [showAuth0Modal, setShowAuth0Modal] = useState<boolean>(false);
 
-  // Sync Auth0 profile if authenticated via Auth0
+  // Sync Auth0 profile if returning from live Auth0 redirect
   useEffect(() => {
     if (isAuth0Authenticated && auth0User) {
       handleAuth0Sync(auth0User);
@@ -39,6 +39,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
         name: userObj.name || userObj.nickname,
         picture: userObj.picture,
       });
+      setShowAuth0Modal(false);
     } catch (err: any) {
       console.error('Auth0 backend sync error:', err);
       setError(err.response?.data?.error || err.response?.data?.details || 'Failed to sync Auth0 account with backend.');
@@ -49,16 +50,31 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
 
   const handleAuth0Click = async () => {
     setError(null);
-    try {
-      // Attempt popup login for quick seamless auth
-      await loginWithPopup();
-    } catch (err: any) {
-      console.warn('Popup login cancelled or failed, trying redirect:', err);
+    const storedDomain = localStorage.getItem('hustlex_auth0_domain');
+    const storedClientId = localStorage.getItem('hustlex_auth0_client_id');
+    const envDomain = import.meta.env.VITE_AUTH0_DOMAIN;
+    const envClientId = import.meta.env.VITE_AUTH0_CLIENT_ID;
+
+    const hasRealDomain = (storedDomain && storedDomain.includes('.')) || (envDomain && envDomain.includes('.') && envDomain !== 'dev-hustlex.us.auth0.com');
+    const hasRealClientId = (storedClientId && storedClientId.length > 5) || (envClientId && envClientId.length > 5 && envClientId !== 'client-id-placeholder');
+
+    if (hasRealDomain && hasRealClientId) {
+      // Direct live Auth0 redirect
+      setLoading(true);
       try {
-        await loginWithRedirect();
-      } catch (redirectErr: any) {
-        setError(redirectErr.message || 'Auth0 authentication failed. Check VITE_AUTH0_DOMAIN configuration.');
+        await loginWithRedirect({
+          authorizationParams: {
+            redirect_uri: window.location.origin,
+          },
+        });
+      } catch (err: any) {
+        console.warn('Auth0 redirect error:', err);
+        setLoading(false);
+        setShowAuth0Modal(true);
       }
+    } else {
+      // Open interactive Auth0 SSO drawer/modal with 1-click sync or tenant config
+      setShowAuth0Modal(true);
     }
   };
 
@@ -106,17 +122,39 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
 
           {/* Auth0 Primary Single Sign-On Button */}
           <div>
-            <button
-              type="button"
-              onClick={handleAuth0Click}
-              disabled={loading || isAuth0Loading}
-              className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-orange-600 via-amber-600 to-indigo-600 hover:from-orange-500 hover:to-indigo-500 text-white text-xs font-bold shadow-lg shadow-amber-600/20 flex items-center justify-center gap-2.5 transition-all disabled:opacity-50 group"
-            >
-              <Shield className="w-4 h-4 text-white group-hover:scale-110 transition-transform" />
-              <span>Continue with Auth0 SSO</span>
-            </button>
-            <p className="text-[10px] text-slate-400 text-center mt-1.5">
-              Secure OAuth 2.0 / OpenID Connect authentication
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleAuth0Click}
+                disabled={loading}
+                className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-orange-600 via-amber-600 to-indigo-600 hover:from-orange-500 hover:to-indigo-500 text-white text-xs font-bold shadow-lg shadow-amber-600/20 flex items-center justify-center gap-2.5 transition-all disabled:opacity-50 group"
+              >
+                {loading ? (
+                  <Loader2 className="w-4 h-4 text-white animate-spin" />
+                ) : (
+                  <Shield className="w-4 h-4 text-white group-hover:scale-110 transition-transform" />
+                )}
+                <span>{loading ? 'Authenticating...' : 'Continue with Auth0 SSO'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowAuth0Modal(true)}
+                title="Configure Auth0 Tenant / Sandbox"
+                className="p-3 rounded-xl bg-slate-950 hover:bg-slate-800 text-slate-400 hover:text-orange-400 border border-slate-800 transition-colors"
+              >
+                <SlidersHorizontal className="w-4 h-4" />
+              </button>
+            </div>
+            <p className="text-[10px] text-slate-400 text-center mt-1.5 flex items-center justify-center gap-1.5">
+              <span>Secure OAuth 2.0 / OpenID Connect</span>
+              <span>•</span>
+              <button
+                type="button"
+                onClick={() => setShowAuth0Modal(true)}
+                className="text-orange-400 hover:underline font-semibold"
+              >
+                Configure / Instant Sync
+              </button>
             </p>
           </div>
 
@@ -206,6 +244,14 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
           </div>
         </div>
       </div>
+
+      {/* Auth0 SSO Modal */}
+      <Auth0Modal
+        isOpen={showAuth0Modal}
+        onClose={() => setShowAuth0Modal(false)}
+        onInstantAuth0Sync={handleAuth0Sync}
+        loading={loading}
+      />
     </div>
   );
 };
