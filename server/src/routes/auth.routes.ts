@@ -121,6 +121,45 @@ authRouter.post('/login', async (req: Request, res: Response) => {
   }
 });
 
+// Current User Profile & Teams
+authRouter.get('/me', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user!.id },
+      include: {
+        teamMembers: {
+          where: { removedAt: null },
+          include: { team: true },
+        },
+      },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found.' });
+    }
+
+    return res.json({
+      user: {
+        id: user.id,
+        email: user.email,
+        fullName: user.fullName,
+        title: user.title,
+        avatarUrl: user.avatarUrl,
+      },
+      teams: user.teamMembers.map((tm) => ({
+        teamId: tm.teamId,
+        teamName: tm.team.name,
+        teamSlug: tm.team.slug,
+        role: tm.role,
+        joinedAt: tm.joinedAt,
+      })),
+    });
+  } catch (err: any) {
+    console.error('Error fetching /me profile:', err);
+    return res.status(500).json({ error: 'Failed to fetch user profile.' });
+  }
+});
+
 // Auth0 User Sync & Provisioning
 authRouter.post('/auth0-sync', async (req: Request, res: Response) => {
   try {

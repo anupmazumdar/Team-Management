@@ -1,12 +1,17 @@
 import axios from 'axios';
 
 // In development, default to local proxy '/api'.
-// In production, default to the live Render backend if VITE_API_URL is not set.
-const defaultApiUrl = import.meta.env.DEV
-  ? '/api'
-  : 'https://hustlex-team-workspace-api.onrender.com/api';
-
-const apiBase = import.meta.env.VITE_API_URL || defaultApiUrl;
+// In production, ensure /api is appended regardless of trailing slash in VITE_API_URL.
+const rawApiUrl = import.meta.env.VITE_API_URL;
+let apiBase: string;
+if (import.meta.env.DEV) {
+  apiBase = '/api';
+} else if (rawApiUrl && rawApiUrl.trim().length > 0) {
+  const clean = rawApiUrl.trim().replace(/\/+$/, '');
+  apiBase = clean.endsWith('/api') ? clean : `${clean}/api`;
+} else {
+  apiBase = 'https://hustlex-team-workspace-api.onrender.com/api';
+}
 
 export const api = axios.create({
   baseURL: apiBase,

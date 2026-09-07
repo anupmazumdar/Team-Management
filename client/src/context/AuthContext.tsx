@@ -51,11 +51,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setActiveTeamId(selectedId);
         localStorage.setItem('hustlex_active_team_id', selectedId);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to load user profile:', err);
-      setUser(null);
-      setToken(null);
-      localStorage.removeItem('hustlex_token');
+      // Only clear credentials if the server explicitly rejected the token as invalid/expired
+      if (err.response?.status === 401 || err.response?.status === 403) {
+        setUser(null);
+        setToken(null);
+        localStorage.removeItem('hustlex_token');
+        localStorage.removeItem('hustlex_active_team_id');
+      }
     } finally {
       setLoading(false);
     }
@@ -63,7 +67,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     if (token) {
-      refreshProfile();
+      if (!user) {
+        refreshProfile();
+      } else {
+        setLoading(false);
+      }
     } else {
       setLoading(false);
     }
