@@ -120,9 +120,69 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
     import.meta.env.VITE_GOOGLE_CLIENT_ID ||
     '612857418194-j68nke48tjglhvtdql05s8s7tfj4bhpe.apps.googleusercontent.com';
 
-  // Automatic Google One Tap on page load
+  const googleTokenClientRef = React.useRef<any>(null);
+
+  const initGoogleTokenClient = () => {
+    if (window.google?.accounts?.oauth2 && !googleTokenClientRef.current) {
+      try {
+        googleTokenClientRef.current = window.google.accounts.oauth2.initTokenClient({
+          client_id: GOOGLE_CLIENT_ID,
+          scope: 'openid email profile',
+          error_callback: (nonOAuthErr: any) => {
+            console.error('Google Sign-In error_callback:', nonOAuthErr);
+            if (nonOAuthErr.type === 'popup_failed_to_open') {
+              setError('Google popup was blocked. Please click the AdBlock / pop-up icon in your browser address bar and select "Always allow popups on this site".');
+            } else if (nonOAuthErr.type === 'popup_closed') {
+              setError('Google popup was closed before completing login.');
+            } else {
+              setError(`Google Sign-In: ${nonOAuthErr.message || nonOAuthErr.type || 'Origin error. Ensure https://team-management-server-pied.vercel.app is added to Authorized JavaScript Origins in Google Cloud Console.'}`);
+            }
+            setSocialLoading(false);
+          },
+          callback: async (tokenResponse: any) => {
+            if (tokenResponse.error) {
+              console.error('Google OAuth error:', tokenResponse);
+              setError(`Google Sign-In: ${tokenResponse.error_description || tokenResponse.error}. (Ensure https://team-management-server-pied.vercel.app is added to Authorized Origins in Google Cloud Console)`);
+              setSocialLoading(false);
+              return;
+            }
+            if (tokenResponse.access_token) {
+              try {
+                const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+                  headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
+                });
+                const profile = await userInfoRes.json();
+                await handleSocialSync({
+                  provider: 'google',
+                  providerId: `google|${profile.sub}`,
+                  email: profile.email,
+                  fullName: profile.name || profile.email.split('@')[0],
+                  avatarUrl: profile.picture,
+                  headline: 'Google Verified Member',
+                });
+              } catch (syncErr: any) {
+                console.error('Failed to sync Google user:', syncErr);
+                if (syncErr.code === 'ECONNABORTED' || syncErr.message?.includes('timeout')) {
+                  setError('Request timed out connecting to backend server. Render may be waking up.');
+                } else {
+                  setError(syncErr.response?.data?.error || syncErr.response?.data?.details || syncErr.message || 'Failed to sync Google profile with database.');
+                }
+              } finally {
+                setSocialLoading(false);
+              }
+            }
+          },
+        });
+      } catch (err) {
+        console.warn('Google token client pre-init notice:', err);
+      }
+    }
+  };
+
+  // Automatic Google One Tap & Token Client pre-init on page load
   useEffect(() => {
-    const initGoogleOneTap = () => {
+    const setupGoogle = () => {
+      initGoogleTokenClient();
       if (window.google?.accounts?.id) {
         try {
           window.google.accounts.id.initialize({
@@ -165,75 +225,31 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
       }
     };
 
-    if (window.google?.accounts?.id) {
-      initGoogleOneTap();
+    if (window.google?.accounts?.oauth2) {
+      setupGoogle();
     } else {
-      const timer = setTimeout(initGoogleOneTap, 1000);
+      const timer = setTimeout(setupGoogle, 800);
       return () => clearTimeout(timer);
     }
   }, []);
 
   const handleGoogleRealSignIn = () => {
     setError(null);
-    if (!window.google?.accounts?.oauth2) {
-      setError('Google Identity Services is initializing. Please click again in 1 second.');
+    if (!googleTokenClientRef.current) {
+      initGoogleTokenClient();
+    }
+
+    if (!googleTokenClientRef.current) {
+      setError('Google Identity Services is initializing. Please try again in 1-2 seconds.');
       return;
     }
+
     setSocialLoading(true);
     try {
-      const client = window.google.accounts.oauth2.initTokenClient({
-        client_id: GOOGLE_CLIENT_ID,
-        scope: 'openid email profile',
-        error_callback: (nonOAuthErr: any) => {
-          console.error('Google Sign-In error_callback:', nonOAuthErr);
-          if (nonOAuthErr.type === 'popup_failed_to_open') {
-            setError('Google popup was blocked. Please disable AdBlock or allow popups for this site.');
-          } else if (nonOAuthErr.type === 'popup_closed') {
-            setError('Google popup was closed before completing login.');
-          } else {
-            setError(`Google Sign-In: ${nonOAuthErr.message || nonOAuthErr.type || 'Origin error. Ensure https://team-management-server-pied.vercel.app is added to Authorized JavaScript Origins in Google Cloud Console.'}`);
-          }
-          setSocialLoading(false);
-        },
-        callback: async (tokenResponse: any) => {
-          if (tokenResponse.error) {
-            console.error('Google OAuth error:', tokenResponse);
-            setError(`Google Sign-In: ${tokenResponse.error_description || tokenResponse.error}. (Ensure https://team-management-server-pied.vercel.app is added to Authorized Origins in Google Cloud Console)`);
-            setSocialLoading(false);
-            return;
-          }
-          if (tokenResponse.access_token) {
-            try {
-              // Fetch user profile from Google's standard UserInfo endpoint
-              const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-                headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
-              });
-              const profile = await userInfoRes.json();
-              await handleSocialSync({
-                provider: 'google',
-                providerId: `google|${profile.sub}`,
-                email: profile.email,
-                fullName: profile.name || profile.email.split('@')[0],
-                avatarUrl: profile.picture,
-                headline: 'Google Verified Member',
-              });
-            } catch (syncErr: any) {
-              console.error('Failed to sync Google user:', syncErr);
-              if (syncErr.code === 'ECONNABORTED' || syncErr.message?.includes('timeout')) {
-                setError('Request timed out connecting to backend server. Render may be waking up.');
-              } else {
-                setError(syncErr.response?.data?.error || syncErr.response?.data?.details || syncErr.message || 'Failed to sync Google profile with database.');
-              }
-            } finally {
-              setSocialLoading(false);
-            }
-          }
-        },
-      });
-      client.requestAccessToken();
+      googleTokenClientRef.current.requestAccessToken({ prompt: 'select_account' });
     } catch (err: any) {
-      console.error('Failed to initialize Google token client:', err);
-      setError('Could not open Google Sign-In popup. Please ensure popups are allowed in your browser.');
+      console.error('Failed to request Google access token:', err);
+      setError('Could not open Google Sign-In popup. Please allow popups for this site in your browser.');
       setSocialLoading(false);
     }
   };
