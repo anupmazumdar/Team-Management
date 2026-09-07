@@ -7,6 +7,10 @@ import { authenticateToken } from '../middleware/auth.js';
 
 export const authRouter = Router();
 
+export const ADMIN_EMAILS = ['thezeroanup0@gmail.com'];
+export const isAdmin = (email?: string | null) =>
+  Boolean(email && ADMIN_EMAILS.includes(email.toLowerCase().trim()));
+
 // Register new user
 authRouter.post('/register', async (req: Request, res: Response) => {
   try {
@@ -111,7 +115,7 @@ authRouter.post('/login', async (req: Request, res: Response) => {
         teamId: tm.teamId,
         teamName: tm.team.name,
         teamSlug: tm.team.slug,
-        role: tm.role,
+        role: isAdmin(user.email) ? 'admin' : tm.role,
         joinedAt: tm.joinedAt,
       })),
     });
@@ -204,6 +208,13 @@ authRouter.post('/auth0-sync', async (req: Request, res: Response) => {
           },
         },
       });
+
+      if (isAdmin(cleanEmail)) {
+        await prisma.teamMember.updateMany({
+          where: { userId: user.id },
+          data: { role: 'admin' },
+        });
+      }
     } else {
       // Provision new user in PostgreSQL
       const primaryTeam = await prisma.team.findFirst({
@@ -232,7 +243,7 @@ authRouter.post('/auth0-sync', async (req: Request, res: Response) => {
           data: {
             teamId: primaryTeam.id,
             userId: user.id,
-            role: cleanEmail === 'admin@hustlex.com' ? 'admin' : 'member',
+            role: isAdmin(cleanEmail) ? 'admin' : 'member',
           },
         });
 
@@ -334,6 +345,13 @@ authRouter.post('/social-sync', async (req: Request, res: Response) => {
           },
         },
       });
+
+      if (isAdmin(cleanEmail)) {
+        await prisma.teamMember.updateMany({
+          where: { userId: user.id },
+          data: { role: 'admin' },
+        });
+      }
     } else {
       // Provision new user in PostgreSQL
       const primaryTeam = await prisma.team.findFirst({
@@ -363,7 +381,7 @@ authRouter.post('/social-sync', async (req: Request, res: Response) => {
           data: {
             teamId: primaryTeam.id,
             userId: user.id,
-            role: 'member',
+            role: isAdmin(cleanEmail) ? 'admin' : 'member',
           },
         });
 
@@ -524,6 +542,13 @@ authRouter.post('/github-exchange', async (req: Request, res: Response) => {
           },
         },
       });
+
+      if (isAdmin(cleanEmail)) {
+        await prisma.teamMember.updateMany({
+          where: { userId: user.id },
+          data: { role: 'admin' },
+        });
+      }
     } else {
       const primaryTeam = await prisma.team.findFirst({
         orderBy: { createdAt: 'asc' },
@@ -551,7 +576,7 @@ authRouter.post('/github-exchange', async (req: Request, res: Response) => {
           data: {
             teamId: primaryTeam.id,
             userId: user.id,
-            role: cleanEmail === 'admin@hustlex.com' ? 'admin' : 'member',
+            role: isAdmin(cleanEmail) ? 'admin' : 'member',
           },
         });
 
@@ -628,7 +653,7 @@ authRouter.get('/me', authenticateToken, async (req: Request, res: Response) => 
         teamId: tm.teamId,
         teamName: tm.team.name,
         teamSlug: tm.team.slug,
-        role: tm.role,
+        role: isAdmin(user.email) ? 'admin' : tm.role,
         joinedAt: tm.joinedAt,
       })),
     });
