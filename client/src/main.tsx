@@ -10,6 +10,11 @@ const storedClientId = typeof window !== 'undefined' ? localStorage.getItem('hus
 const auth0Domain = storedDomain || import.meta.env.VITE_AUTH0_DOMAIN || 'dev-hustlex.us.auth0.com';
 const auth0ClientId = storedClientId || import.meta.env.VITE_AUTH0_CLIENT_ID || 'client-id-placeholder';
 
+const isGitHubCallback =
+  typeof window !== 'undefined' &&
+  (window.location.search.includes('state=github_oauth') ||
+   (window.location.search.includes('code=') && !window.location.search.includes('state=')));
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <Auth0Provider
@@ -18,7 +23,7 @@ createRoot(document.getElementById('root')!).render(
       authorizationParams={{
         redirect_uri: typeof window !== 'undefined' ? window.location.origin : '',
       }}
-      skipRedirectCallback={window.location.search.includes('code=') === false}
+      skipRedirectCallback={isGitHubCallback || window.location.search.includes('code=') === false}
     >
       <App />
     </Auth0Provider>

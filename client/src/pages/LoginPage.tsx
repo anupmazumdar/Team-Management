@@ -32,7 +32,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const ghCode = urlParams.get('code');
-    if (ghCode) {
+    const state = urlParams.get('state');
+    if (ghCode && (state === 'github_oauth' || !state)) {
       window.history.replaceState({}, document.title, window.location.pathname);
       handleGitHubCodeExchange(ghCode);
     }
@@ -191,7 +192,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
     setError(null);
     setSocialLoading(true);
     const redirectUri = window.location.origin;
-    window.location.href = `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&scope=read:user,user:email&redirect_uri=${encodeURIComponent(redirectUri)}`;
+    window.location.href = `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&scope=read:user,user:email&redirect_uri=${encodeURIComponent(redirectUri)}&state=github_oauth`;
   };
 
   const handleAuth0Click = async () => {
