@@ -120,6 +120,59 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
     import.meta.env.VITE_GOOGLE_CLIENT_ID ||
     '612857418194-j68nke48tjglhvtdql05s8s7tfj4bhpe.apps.googleusercontent.com';
 
+  // Automatic Google One Tap on page load
+  useEffect(() => {
+    const initGoogleOneTap = () => {
+      if (window.google?.accounts?.id) {
+        try {
+          window.google.accounts.id.initialize({
+            client_id: GOOGLE_CLIENT_ID,
+            auto_select: false,
+            cancel_on_tap_outside: true,
+            callback: async (response: any) => {
+              if (response?.credential) {
+                try {
+                  setSocialLoading(true);
+                  const base64Url = response.credential.split('.')[1];
+                  const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+                  const jsonPayload = decodeURIComponent(
+                    atob(base64)
+                      .split('')
+                      .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+                      .join('')
+                  );
+                  const profile = JSON.parse(jsonPayload);
+                  await handleSocialSync({
+                    provider: 'google',
+                    providerId: `google|${profile.sub}`,
+                    email: profile.email,
+                    fullName: profile.name || profile.email.split('@')[0],
+                    avatarUrl: profile.picture,
+                    headline: 'Google Verified Member',
+                  });
+                } catch (e) {
+                  console.error('Failed to parse Google One Tap credential:', e);
+                } finally {
+                  setSocialLoading(false);
+                }
+              }
+            },
+          });
+          window.google.accounts.id.prompt();
+        } catch (err) {
+          console.warn('Google One Tap init notice:', err);
+        }
+      }
+    };
+
+    if (window.google?.accounts?.id) {
+      initGoogleOneTap();
+    } else {
+      const timer = setTimeout(initGoogleOneTap, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
   const handleGoogleRealSignIn = () => {
     setError(null);
     if (!window.google?.accounts?.oauth2) {
