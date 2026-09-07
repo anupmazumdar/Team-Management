@@ -8,12 +8,13 @@ import {
   Clock,
   Layers,
   LogOut,
-  Sparkles,
   Users,
   Shield,
   Briefcase,
   ChevronDown,
+  Database,
 } from 'lucide-react';
+import { ExportModal } from '../common/ExportModal';
 
 interface NavbarProps {
   currentTab: string;
@@ -21,11 +22,12 @@ interface NavbarProps {
 }
 
 export const Navbar: React.FC<NavbarProps> = ({ setCurrentTab }) => {
-  const { user, activeTeam, activeRole, teams, switchTeam, quickSwitchUser, logout } = useAuth();
+  const { user, activeTeam, activeRole, teams, switchTeam, logout } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState<number>(0);
   const [showNotifications, setShowNotifications] = useState<boolean>(false);
   const [showTeamDropdown, setShowTeamDropdown] = useState<boolean>(false);
+  const [showExportModal, setShowExportModal] = useState<boolean>(false);
   const notifRef = useRef<HTMLDivElement>(null);
   const teamRef = useRef<HTMLDivElement>(null);
 
@@ -141,56 +143,24 @@ export const Navbar: React.FC<NavbarProps> = ({ setCurrentTab }) => {
         </div>
       </div>
 
-      {/* Demo Persona Switcher (Super handy for verifying role & verification workflows) */}
-      <div className="hidden lg:flex items-center gap-1.5 bg-slate-950/70 p-1 rounded-xl border border-slate-800/90 text-xs">
-        <span className="text-[11px] font-medium text-slate-400 px-2 flex items-center gap-1">
-          <Sparkles className="w-3 h-3 text-amber-400" /> Demo Switcher:
-        </span>
+      {/* Export Workspace & Admin Status */}
+      <div className="flex items-center gap-2">
         <button
-          onClick={() => quickSwitchUser('admin@hustlex.com')}
-          title="Alex Turner (Admin)"
-          className={`px-2.5 py-1 rounded-lg font-medium transition-all ${
-            user?.email === 'admin@hustlex.com'
-              ? 'bg-rose-600 text-white shadow-md shadow-rose-600/20'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-          }`}
+          onClick={() => setShowExportModal(true)}
+          className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 text-xs font-semibold shadow-sm transition-all hover:scale-[1.02]"
+          title="Export database records, deliverables, and SLA audit logs"
         >
-          Admin (Alex)
-        </button>
-        <button
-          onClick={() => quickSwitchUser('lead@hustlex.com')}
-          title="Sarah Chen (Team Lead)"
-          className={`px-2.5 py-1 rounded-lg font-medium transition-all ${
-            user?.email === 'lead@hustlex.com'
-              ? 'bg-amber-600 text-white shadow-md shadow-amber-600/20'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-          }`}
-        >
-          Lead (Sarah)
-        </button>
-        <button
-          onClick={() => quickSwitchUser('intern1@hustlex.com')}
-          title="Devin Patel (Intern 1)"
-          className={`px-2.5 py-1 rounded-lg font-medium transition-all ${
-            user?.email === 'intern1@hustlex.com'
-              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-          }`}
-        >
-          Intern 1 (Devin)
-        </button>
-        <button
-          onClick={() => quickSwitchUser('intern2@hustlex.com')}
-          title="Maya Lin (Intern 2)"
-          className={`px-2.5 py-1 rounded-lg font-medium transition-all ${
-            user?.email === 'intern2@hustlex.com'
-              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-          }`}
-        >
-          Intern 2 (Maya)
+          <Database className="w-3.5 h-3.5 text-indigo-400" />
+          <span>Export Data</span>
         </button>
       </div>
+
+      {/* Export Modal */}
+      <ExportModal
+        isOpen={showExportModal}
+        onClose={() => setShowExportModal(false)}
+        teamName={activeTeam?.teamName || 'HustleX Workspace'}
+      />
 
       {/* Right User Bar & Notifications */}
       <div className="flex items-center gap-4">

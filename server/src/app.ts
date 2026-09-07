@@ -11,6 +11,7 @@ import { internshipRouter } from './routes/internship.routes.js';
 import { activityRouter } from './routes/activity.routes.js';
 import { notificationRouter } from './routes/notification.routes.js';
 import { uploadRouter } from './routes/upload.routes.js';
+import { exportRouter } from './routes/export.routes.js';
 
 export const app = express();
 
@@ -34,6 +35,7 @@ app.use('/api/internship', internshipRouter);
 app.use('/api/activity', activityRouter);
 app.use('/api/notifications', notificationRouter);
 app.use('/api/uploads', uploadRouter);
+app.use('/api/export', exportRouter);
 
 // Root healthcheck
 app.get('/api/health', (req: Request, res: Response) => {

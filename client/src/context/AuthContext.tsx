@@ -10,6 +10,7 @@ interface AuthContextType {
   activeRole: TeamRole | null;
   loading: boolean;
   login: (email: string, password?: string) => Promise<void>;
+  loginWithAuth0: (auth0User: { sub?: string; email?: string; name?: string; picture?: string }) => Promise<void>;
   register: (data: { email: string; password: string; fullName: string; title?: string }) => Promise<void>;
   logout: () => void;
   switchTeam: (teamId: string) => void;
@@ -79,6 +80,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const loginWithAuth0 = async (auth0User: { sub?: string; email?: string; name?: string; picture?: string }) => {
+    setLoading(true);
+    try {
+      const res = await api.post('/auth/auth0-sync', {
+        auth0Id: auth0User.sub,
+        email: auth0User.email,
+        fullName: auth0User.name,
+        avatarUrl: auth0User.picture,
+      });
+      const { token: newToken, user: newUser, teams: userTeams } = res.data;
+      localStorage.setItem('hustlex_token', newToken);
+      setToken(newToken);
+      setUser(newUser);
+      setTeams(userTeams || []);
+
+      if (userTeams?.length > 0) {
+        setActiveTeamId(userTeams[0].teamId);
+        localStorage.setItem('hustlex_active_team_id', userTeams[0].teamId);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const register = async (data: { email: string; password: string; fullName: string; title?: string }) => {
     setLoading(true);
     try {
@@ -123,6 +148,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         activeRole,
         loading,
         login,
+        loginWithAuth0,
         register,
         logout,
         switchTeam,

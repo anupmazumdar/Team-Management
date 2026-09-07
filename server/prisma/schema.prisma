@@ -10,7 +10,9 @@ datasource db {
 model User {
   id           String   @id @default(uuid())
   email        String   @unique
-  passwordHash String   @map("password_hash")
+  passwordHash String?  @map("password_hash")
+  auth0Id      String?  @unique @map("auth0_id")
+  authProvider String   @default("local") @map("auth_provider")
   fullName     String   @map("full_name")
   avatarUrl    String?  @map("avatar_url")
   title        String?

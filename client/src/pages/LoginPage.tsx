@@ -1,17 +1,66 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Layers, Shield, Sparkles, ArrowRight, Lock, Mail } from 'lucide-react';
+import { useAuth0 } from '@auth0/auth0-react';
+import { Layers, Shield, Sparkles, Lock, Mail } from 'lucide-react';
 
 interface LoginPageProps {
   onGoToRegister: () => void;
 }
 
 export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
-  const { login } = useAuth();
+  const { login, loginWithAuth0 } = useAuth();
+  const {
+    loginWithPopup,
+    loginWithRedirect,
+    user: auth0User,
+    isAuthenticated: isAuth0Authenticated,
+    isLoading: isAuth0Loading,
+  } = useAuth0();
+
   const [email, setEmail] = useState<string>('admin@hustlex.com');
   const [password, setPassword] = useState<string>('Password123!');
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Sync Auth0 profile if authenticated via Auth0
+  useEffect(() => {
+    if (isAuth0Authenticated && auth0User) {
+      handleAuth0Sync(auth0User);
+    }
+  }, [isAuth0Authenticated, auth0User]);
+
+  const handleAuth0Sync = async (userObj: any) => {
+    setLoading(true);
+    setError(null);
+    try {
+      await loginWithAuth0({
+        sub: userObj.sub,
+        email: userObj.email,
+        name: userObj.name || userObj.nickname,
+        picture: userObj.picture,
+      });
+    } catch (err: any) {
+      console.error('Auth0 backend sync error:', err);
+      setError(err.response?.data?.error || err.response?.data?.details || 'Failed to sync Auth0 account with backend.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAuth0Click = async () => {
+    setError(null);
+    try {
+      // Attempt popup login for quick seamless auth
+      await loginWithPopup();
+    } catch (err: any) {
+      console.warn('Popup login cancelled or failed, trying redirect:', err);
+      try {
+        await loginWithRedirect();
+      } catch (redirectErr: any) {
+        setError(redirectErr.message || 'Auth0 authentication failed. Check VITE_AUTH0_DOMAIN configuration.');
+      }
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -21,24 +70,15 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
       await login(email, password);
     } catch (err: any) {
       console.error(err);
-      setError(err.response?.data?.error || 'Failed to login');
+      setError(err.response?.data?.error || err.response?.data?.details || 'Failed to login');
     } finally {
       setLoading(false);
     }
   };
 
-  const handlePersonaLogin = async (personaEmail: string) => {
-    setEmail(personaEmail);
+  const handleAdminQuickFill = () => {
+    setEmail('admin@hustlex.com');
     setPassword('Password123!');
-    setLoading(true);
-    setError(null);
-    try {
-      await login(personaEmail, 'Password123!');
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to login');
-    } finally {
-      setLoading(false);
-    }
   };
 
   return (
@@ -52,17 +92,41 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
         </div>
         <h2 className="text-2xl font-black text-white tracking-tight">HustleX Workspace</h2>
         <p className="mt-1 text-xs text-slate-400">
-          Task verification state machine • Dynamic roles • 6-Mo timeline
+          Enterprise task management • Auth0 SSO • Mission SLA verification
         </p>
       </div>
 
       <div className="mt-6 sm:mx-auto sm:w-full sm:max-w-md relative z-10">
-        <div className="glass-panel py-8 px-6 sm:px-10 rounded-2xl border border-slate-800 shadow-2xl">
+        <div className="glass-panel py-8 px-6 sm:px-10 rounded-2xl border border-slate-800 shadow-2xl space-y-6">
           {error && (
-            <div className="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-xs text-rose-300">
+            <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-xs text-rose-300">
               {error}
             </div>
           )}
+
+          {/* Auth0 Primary Single Sign-On Button */}
+          <div>
+            <button
+              type="button"
+              onClick={handleAuth0Click}
+              disabled={loading || isAuth0Loading}
+              className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-orange-600 via-amber-600 to-indigo-600 hover:from-orange-500 hover:to-indigo-500 text-white text-xs font-bold shadow-lg shadow-amber-600/20 flex items-center justify-center gap-2.5 transition-all disabled:opacity-50 group"
+            >
+              <Shield className="w-4 h-4 text-white group-hover:scale-110 transition-transform" />
+              <span>Continue with Auth0 SSO</span>
+            </button>
+            <p className="text-[10px] text-slate-400 text-center mt-1.5">
+              Secure OAuth 2.0 / OpenID Connect authentication
+            </p>
+          </div>
+
+          <div className="relative flex py-1 items-center">
+            <div className="flex-grow border-t border-slate-800"></div>
+            <span className="flex-shrink mx-4 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+              Or Sign In with Email
+            </span>
+            <div className="flex-grow border-t border-slate-800"></div>
+          </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
@@ -102,44 +166,42 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
             </button>
           </form>
 
-          {/* Quick 1-Click Persona Login */}
-          <div className="mt-6 pt-5 border-t border-slate-800/80">
-            <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-amber-400" /> Quick Persona Logins (1-Click)
+          {/* Single Admin Account Badge */}
+          <div className="pt-4 border-t border-slate-800/80">
+            <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-amber-400" /> Workspace Admin Account
+              </span>
+              <button
+                type="button"
+                onClick={handleAdminQuickFill}
+                className="text-[10px] text-indigo-400 hover:text-indigo-300 underline"
+              >
+                Auto-fill
+              </button>
             </div>
 
-            <div className="space-y-1.5">
-              {[
-                { name: 'Alex Turner', email: 'admin@hustlex.com', role: 'ADMIN', color: 'text-rose-400' },
-                { name: 'Sarah Chen', email: 'lead@hustlex.com', role: 'LEAD', color: 'text-amber-400' },
-                { name: 'Devin Patel', email: 'intern1@hustlex.com', role: 'INTERN 1', color: 'text-indigo-400' },
-                { name: 'Maya Lin', email: 'intern2@hustlex.com', role: 'INTERN 2', color: 'text-indigo-400' },
-                { name: 'Rahul Sharma', email: 'intern3@hustlex.com', role: 'INTERN 3', color: 'text-indigo-400' },
-              ].map((p) => (
-                <button
-                  key={p.email}
-                  type="button"
-                  onClick={() => handlePersonaLogin(p.email)}
-                  className="w-full text-left p-2 rounded-xl bg-slate-950/80 hover:bg-slate-800 border border-slate-800/80 text-xs flex items-center justify-between transition-colors group"
-                >
-                  <span className="font-medium text-slate-200 group-hover:text-white">
-                    {p.name}
-                  </span>
-                  <span className={`text-[10px] font-mono font-bold ${p.color}`}>
-                    {p.role} →
-                  </span>
-                </button>
-              ))}
+            <div
+              onClick={handleAdminQuickFill}
+              className="p-3 rounded-xl bg-slate-950/80 hover:bg-slate-900 border border-slate-800/80 cursor-pointer text-xs flex items-center justify-between transition-colors"
+            >
+              <div>
+                <div className="font-semibold text-slate-200">Alex Turner</div>
+                <div className="text-[11px] text-slate-400">admin@hustlex.com</div>
+              </div>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                ADMIN
+              </span>
             </div>
           </div>
 
-          <div className="mt-4 text-center">
+          <div className="text-center pt-2">
             <button
               type="button"
               onClick={onGoToRegister}
               className="text-xs text-indigo-400 hover:text-indigo-300 font-medium"
             >
-              Need an account? Register here
+              Need a direct account? Register here
             </button>
           </div>
         </div>
