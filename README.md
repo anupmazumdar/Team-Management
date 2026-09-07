@@ -51,43 +51,47 @@ Not Started ➔ In Progress ➔ Submitted ➔ Under Review ➔ Approved
 
 ---
 
-## 👥 Seed Credentials (Password for all: `Password123!`)
+## 👥 Seed & Authentication Credentials
 
-| Name | Email | Default Role | Title |
-|---|---|---|---|
-| **Alex Turner** | `admin@hustlex.com` | `admin` | VP of Engineering & Workspace Admin |
-| **Sarah Chen** | `lead@hustlex.com` | `lead` | Senior Engineering Team Lead |
-| **Devin Patel** | `intern1@hustlex.com` | `member` | Full Stack Engineering Intern |
-| **Maya Lin** | `intern2@hustlex.com` | `member` | Frontend UI/UX Intern |
-| **Rahul Sharma** | `intern3@hustlex.com` | `member` | Backend Systems Intern |
+### Admin Account (Initialized via `npm run prisma:seed`)
+| Name | Email | Password | Role | Title |
+|---|---|---|---|---|
+| **Alex Turner** | `admin@hustlex.com` | `Password123!` | `admin` | VP of Engineering & Workspace Admin |
 
-> 💡 **Tip**: The login screen features a **1-Click Quick Persona Switcher** allowing instant persona testing without typing credentials.
+### Social & SSO Authenticators
+The login interface supports:
+- **Auth0 SSO**: Enterprise OpenID Connect / OAuth 2.0 with backend database sync
+- **Google Authenticator**: Instant verified profile + OAuth redirect
+- **GitHub Authenticator**: Developer identity + OAuth redirect
+- **LinkedIn Authenticator**: Professional profile + OAuth redirect
+
+All authenticators automatically persist profiles in the PostgreSQL database and link members to the primary workspace.
 
 ---
 
 ## 🚀 Quick Start & Local Run
 
 ### Prerequisites
-- Node.js v18+ (tested on Node v24)
-- PostgreSQL connection (pre-configured with Neon cloud database in `.env`)
+- Node.js v18+ (tested on Node v20/v22/v24)
+- PostgreSQL connection (Neon, Supabase, or local PostgreSQL instance)
 
 ### 1. Install Dependencies
 ```bash
-# In server directory
-cd server
-npm install
-
-# In client directory
-cd ../client
+# From repository root
 npm install
 ```
 
 ### 2. Configure Environment Variables
-A configured `.env` file is ready in `server/.env`:
+Copy `.env.example` in the `server` directory:
+```bash
+cp server/.env.example server/.env
+```
+
+Configure `server/.env`:
 ```ini
 PORT=5000
-DATABASE_URL="postgresql://neondb_owner:npg_lZXVUqsjMg93@ep-soft-shadow-aytc5lnq.c-5.us-east-2.aws.neon.tech/neondb?sslmode=require"
-JWT_SECRET="hustlex_super_secure_jwt_secret_key_2026_workspace_token"
+DATABASE_URL="postgresql://username:password@ep-your-database-host.neon.tech/neondb?sslmode=require"
+JWT_SECRET="your-secure-jwt-secret-key-min-32-chars"
 JWT_EXPIRES_IN="7d"
 CLIENT_URL="http://localhost:5173"
 UPLOAD_DIR="./uploads"

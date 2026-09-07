@@ -15,6 +15,10 @@ out/
 .env.development.local
 .env.test.local
 .env.production.local
+server/.env
+client/.env
+*.env
+!*.env.example
 
 # Vercel
 .vercel

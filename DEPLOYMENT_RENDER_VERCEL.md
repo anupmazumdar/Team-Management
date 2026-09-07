@@ -7,16 +7,16 @@ This guide walks you through deploying **Hustlex Team Workspace** with:
 
 ---
 
-## 🏗️ Architecture & Credentials Summary
+## 🏗️ Architecture & Configuration Requirements
 
 - **GitHub Repository**: [https://github.com/anupmazumdar/Team-Management](https://github.com/anupmazumdar/Team-Management)
-- **Database (Neon PostgreSQL)**: Already provisioned and seeded!
+- **Database (PostgreSQL)**: Neon Serverless PostgreSQL, Supabase, or self-hosted
   ```
-  DATABASE_URL="postgresql://neondb_owner:npg_lZXVUqsjMg93@ep-soft-shadow-aytc5lnq.c-5.us-east-2.aws.neon.tech/neondb?sslmode=require"
+  DATABASE_URL="postgresql://username:password@ep-your-database-host.neon.tech/neondb?sslmode=require"
   ```
-- **JWT Secret Key**:
+- **JWT Secret Key**: Random 32+ character string for token signing
   ```
-  JWT_SECRET="hustlex_workspace_jwt_secret_key_prod_2025"
+  JWT_SECRET="your-secure-jwt-secret-key-min-32-chars"
   ```
 
 ---
@@ -28,7 +28,8 @@ This guide walks you through deploying **Hustlex Team Workspace** with:
 2. Click **"New +"** → **"Blueprint"**.
 3. Connect your GitHub repository: `https://github.com/anupmazumdar/Team-Management`.
 4. Render will detect [`render.yaml`](render.yaml) and automatically configure the service.
-5. Click **"Apply"**.
+5. Render will prompt you to enter `DATABASE_URL`. Paste your Neon connection string.
+6. Click **"Apply"**.
 
 ---
 
@@ -43,7 +44,7 @@ If you prefer creating the Web Service manually:
    - **Runtime**: `Node`
    - **Build Command**:
      ```bash
-     npm install && npx prisma generate && npm run build
+     npm install --include=dev && npx prisma generate && npm run build
      ```
    - **Start Command**:
      ```bash
@@ -52,13 +53,13 @@ If you prefer creating the Web Service manually:
    - **Instance Type**: `Free`
 
 4. Add **Environment Variables**:
-   | Key | Value |
-   |---|---|
-   | `NODE_ENV` | `production` |
-   | `DATABASE_URL` | `postgresql://neondb_owner:npg_g0hZqM3AomwW@ep-soft-shadow-aytc5lnq.c-5.us-east-2.aws.neon.tech/neondb?sslmode=require` |
-   | `JWT_SECRET` | `hustlex_workspace_jwt_secret_key_prod_2025` |
-   | `CORS_ORIGIN` | `*` |
-   | `UPLOAD_DIR` | `./uploads` |
+   | Key | Value | Description |
+   |---|---|---|
+   | `NODE_ENV` | `production` | Production mode |
+   | `DATABASE_URL` | `postgresql://username:password@ep-host.neon.tech/neondb?sslmode=require` | Your Neon DB connection string |
+   | `JWT_SECRET` | `your-secure-jwt-secret-key-min-32-chars` | Secure signing secret |
+   | `CORS_ORIGIN` | `*` | Allowed CORS origins |
+   | `UPLOAD_DIR` | `./uploads` | Local upload directory fallback |
 
 5. Click **"Create Web Service"**.
 6. Once deployed, copy your Render URL (for example: `https://hustlex-backend.onrender.com`).
@@ -91,7 +92,7 @@ If you prefer creating the Web Service manually:
 
 Once both are deployed, open your Vercel URL and test:
 1. **Authentication**:
-   - Log in using the Quick Demo accounts (e.g. `alex.founder@hustlex.com` or `maya.lead@hustlex.com`, password `Password123!`).
+   - Log in using the Admin account (`admin@hustlex.com`, password `Password123!`), click **"Continue with Auth0 SSO"**, or sign in using the **Google / GitHub / LinkedIn** authenticators.
 2. **Mission Assignment**:
    - Click **"+ Create Task"**. Fill in title, description, and the **"Mission Details & On-Time Deliverable Briefing"** textarea.
    - Assign to a team member with a deadline.
