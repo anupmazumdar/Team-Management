@@ -120,138 +120,66 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
     import.meta.env.VITE_GOOGLE_CLIENT_ID ||
     '612857418194-j68nke48tjglhvtdql05s8s7tfj4bhpe.apps.googleusercontent.com';
 
-  const googleTokenClientRef = React.useRef<any>(null);
-
-  const initGoogleTokenClient = () => {
-    if (window.google?.accounts?.oauth2 && !googleTokenClientRef.current) {
-      try {
-        googleTokenClientRef.current = window.google.accounts.oauth2.initTokenClient({
-          client_id: GOOGLE_CLIENT_ID,
-          scope: 'openid email profile',
-          error_callback: (nonOAuthErr: any) => {
-            console.error('Google Sign-In error_callback:', nonOAuthErr);
-            if (nonOAuthErr.type === 'popup_failed_to_open') {
-              setError('Google popup was blocked. Please click the AdBlock / pop-up icon in your browser address bar and select "Always allow popups on this site".');
-            } else if (nonOAuthErr.type === 'popup_closed') {
-              setError('Google popup was closed before completing login.');
-            } else {
-              setError(`Google Sign-In: ${nonOAuthErr.message || nonOAuthErr.type || 'Origin error. Ensure https://team-management-server-pied.vercel.app is added to Authorized JavaScript Origins in Google Cloud Console.'}`);
-            }
-            setSocialLoading(false);
-          },
-          callback: async (tokenResponse: any) => {
-            if (tokenResponse.error) {
-              console.error('Google OAuth error:', tokenResponse);
-              setError(`Google Sign-In: ${tokenResponse.error_description || tokenResponse.error}. (Ensure https://team-management-server-pied.vercel.app is added to Authorized Origins in Google Cloud Console)`);
-              setSocialLoading(false);
-              return;
-            }
-            if (tokenResponse.access_token) {
-              try {
-                const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-                  headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
-                });
-                const profile = await userInfoRes.json();
-                await handleSocialSync({
-                  provider: 'google',
-                  providerId: `google|${profile.sub}`,
-                  email: profile.email,
-                  fullName: profile.name || profile.email.split('@')[0],
-                  avatarUrl: profile.picture,
-                  headline: 'Google Verified Member',
-                });
-              } catch (syncErr: any) {
-                console.error('Failed to sync Google user:', syncErr);
-                if (syncErr.code === 'ECONNABORTED' || syncErr.message?.includes('timeout')) {
-                  setError('Request timed out connecting to backend server. Render may be waking up.');
-                } else {
-                  setError(syncErr.response?.data?.error || syncErr.response?.data?.details || syncErr.message || 'Failed to sync Google profile with database.');
-                }
-              } finally {
-                setSocialLoading(false);
-              }
-            }
-          },
-        });
-      } catch (err) {
-        console.warn('Google token client pre-init notice:', err);
-      }
-    }
-  };
-
-  // Automatic Google One Tap & Token Client pre-init on page load
+  // Check for Google OAuth redirect in URL hash (#access_token=...)
   useEffect(() => {
-    const setupGoogle = () => {
-      initGoogleTokenClient();
-      if (window.google?.accounts?.id) {
-        try {
-          window.google.accounts.id.initialize({
-            client_id: GOOGLE_CLIENT_ID,
-            auto_select: false,
-            cancel_on_tap_outside: true,
-            callback: async (response: any) => {
-              if (response?.credential) {
-                try {
-                  setSocialLoading(true);
-                  const base64Url = response.credential.split('.')[1];
-                  const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-                  const jsonPayload = decodeURIComponent(
-                    atob(base64)
-                      .split('')
-                      .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-                      .join('')
-                  );
-                  const profile = JSON.parse(jsonPayload);
-                  await handleSocialSync({
-                    provider: 'google',
-                    providerId: `google|${profile.sub}`,
-                    email: profile.email,
-                    fullName: profile.name || profile.email.split('@')[0],
-                    avatarUrl: profile.picture,
-                    headline: 'Google Verified Member',
-                  });
-                } catch (e) {
-                  console.error('Failed to parse Google One Tap credential:', e);
-                } finally {
-                  setSocialLoading(false);
-                }
-              }
-            },
-          });
-          window.google.accounts.id.prompt();
-        } catch (err) {
-          console.warn('Google One Tap init notice:', err);
-        }
-      }
-    };
+    if (typeof window !== 'undefined' && window.location.hash) {
+      const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+      const accessToken = hashParams.get('access_token');
+      const state = hashParams.get('state');
+      const errorParam = hashParams.get('error');
+      const errorDesc = hashParams.get('error_description');
 
-    if (window.google?.accounts?.oauth2) {
-      setupGoogle();
-    } else {
-      const timer = setTimeout(setupGoogle, 800);
-      return () => clearTimeout(timer);
+      if (errorParam) {
+        window.history.replaceState({}, document.title, window.location.pathname);
+        setError(`Google Sign-In: ${errorDesc || errorParam}. (Ensure https://team-management-server-pied.vercel.app is added to Authorized redirect URIs in Google Cloud Console)`);
+        return;
+      }
+
+      if (accessToken && state === 'google_oauth') {
+        window.history.replaceState({}, document.title, window.location.pathname);
+        handleGoogleTokenSuccess(accessToken);
+      }
     }
   }, []);
 
-  const handleGoogleRealSignIn = () => {
-    setError(null);
-    if (!googleTokenClientRef.current) {
-      initGoogleTokenClient();
-    }
-
-    if (!googleTokenClientRef.current) {
-      setError('Google Identity Services is initializing. Please try again in 1-2 seconds.');
-      return;
-    }
-
+  const handleGoogleTokenSuccess = async (accessToken: string) => {
     setSocialLoading(true);
+    setError(null);
     try {
-      googleTokenClientRef.current.requestAccessToken({ prompt: 'select_account' });
+      const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      const profile = await userInfoRes.json();
+      if (!profile.email) {
+        throw new Error('No email found in Google profile');
+      }
+      await handleSocialSync({
+        provider: 'google',
+        providerId: `google|${profile.sub}`,
+        email: profile.email,
+        fullName: profile.name || profile.email.split('@')[0],
+        avatarUrl: profile.picture,
+        headline: 'Google Verified Member',
+      });
     } catch (err: any) {
-      console.error('Failed to request Google access token:', err);
-      setError('Could not open Google Sign-In popup. Please allow popups for this site in your browser.');
+      console.error('Google profile sync error:', err);
+      if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
+        setError('Request timed out connecting to backend server. Render may be waking up.');
+      } else {
+        setError(err.response?.data?.error || err.response?.data?.details || err.message || 'Failed to sync Google profile with database.');
+      }
+    } finally {
       setSocialLoading(false);
     }
+  };
+
+  // Direct full-page OAuth redirect (100% immune to AdBlock & popup blockers)
+  const handleGoogleRealSignIn = () => {
+    setError(null);
+    setSocialLoading(true);
+    const redirectUri = window.location.origin;
+    const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=openid%20email%20profile&include_granted_scopes=true&state=google_oauth&prompt=select_account`;
+    window.location.href = googleAuthUrl;
   };
 
   const GITHUB_CLIENT_ID =
