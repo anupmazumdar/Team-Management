@@ -1,9 +1,40 @@
 import { Router, Request, Response } from 'express';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../config/db.js';
 import { authenticateToken, requireTeamRole } from '../middleware/auth.js';
 import { logActivity, createNotification } from '../utils/logger.js';
 
 export const teamRouter = Router();
+
+type UserTeamMembership = Prisma.TeamMemberGetPayload<{
+  include: {
+    team: {
+      include: {
+        _count: {
+          select: {
+            members: { where: { removedAt: null } };
+            projects: true;
+            tasks: true;
+          };
+        };
+      };
+    };
+  };
+}>;
+
+export type TeamMemberWithUser = Prisma.TeamMemberGetPayload<{
+  include: {
+    user: {
+      select: {
+        id: true;
+        fullName: true;
+        email: true;
+        avatarUrl: true;
+        title: true;
+      };
+    };
+  };
+}>;
 
 // Apply auth to all team routes
 teamRouter.use(authenticateToken);
@@ -32,7 +63,7 @@ teamRouter.get('/', async (req: Request, res: Response) => {
       orderBy: { joinedAt: 'desc' },
     });
 
-    const teams = memberships.map((m) => ({
+    const teams = memberships.map((m: UserTeamMembership) => ({
       id: m.team.id,
       name: m.team.name,
       slug: m.team.slug,
@@ -223,7 +254,7 @@ teamRouter.get('/:teamId', requireTeamRole(['admin', 'lead', 'member']), async (
 
     // Compute task counts and approval rate for each member
     const membersWithStats = await Promise.all(
-      team.members.map(async (m) => {
+      team.members.map(async (m: TeamMemberWithUser) => {
         const assignedTasks = await prisma.task.count({
           where: { teamId, assignedToId: m.userId },
         });

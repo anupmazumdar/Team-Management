@@ -4,13 +4,10 @@ import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/api';
 import {
   CheckCircle2,
-  Clock,
   Circle,
   Calendar,
   Edit3,
-  Plus,
   Trash2,
-  Sparkles,
   Trophy,
 } from 'lucide-react';
 import { format } from 'date-fns';
@@ -139,7 +136,6 @@ export const InternshipTracker: React.FC<InternshipTrackerProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
         {periods.map((period) => {
           const milestones = Array.isArray(period.milestones) ? period.milestones : [];
-          const completedCount = milestones.filter((m) => m.completed).length;
 
           const getStatusStyle = (status: string) => {
             switch (status) {

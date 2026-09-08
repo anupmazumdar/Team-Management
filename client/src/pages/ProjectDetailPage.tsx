@@ -5,10 +5,8 @@ import { TaskCard } from '../components/tasks/TaskCard';
 import { ChatBox } from '../components/chat/ChatBox';
 import {
   ArrowLeft,
-  FolderKanban,
   ListTodo,
   MessageSquare,
-  Plus,
 } from 'lucide-react';
 
 interface ProjectDetailPageProps {
@@ -28,20 +26,28 @@ export const ProjectDetailPage: React.FC<ProjectDetailPageProps> = ({
   const [activeTab, setActiveTab] = useState<'tasks' | 'chat'>('tasks');
   const [loading, setLoading] = useState<boolean>(true);
 
-  const fetchProjectDetails = async () => {
-    setLoading(true);
-    try {
-      const res = await api.get(`/projects/${projectId}`);
-      setProject(res.data);
-    } catch (err) {
-      console.error('Failed to load project:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
+    let isMounted = true;
+    const fetchProjectDetails = async () => {
+      try {
+        const res = await api.get(`/projects/${projectId}`);
+        if (isMounted) {
+          setProject(res.data);
+        }
+      } catch (err) {
+        console.error('Failed to load project:', err);
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
     fetchProjectDetails();
+
+    return () => {
+      isMounted = false;
+    };
   }, [projectId]);
 
   if (loading || !project) {

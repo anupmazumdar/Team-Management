@@ -2,42 +2,36 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
 import { ActivityLog } from '../types';
-import {
-  History,
-  ShieldAlert,
-  ShieldCheck,
-  PlayCircle,
-  Plus,
-  UserCheck,
-  UserMinus,
-  Sparkles,
-} from 'lucide-react';
 import { format } from 'date-fns';
 
 export const ActivityLogsPage: React.FC = () => {
   const { activeTeam } = useAuth();
   const [logs, setLogs] = useState<ActivityLog[]>([]);
   const [selectedAction, setSelectedAction] = useState<string>('all');
-  const [loading, setLoading] = useState<boolean>(true);
-
-  const fetchLogs = async () => {
-    if (!activeTeam) return;
-    setLoading(true);
-    try {
-      const res = await api.get(
-        `/activity/${activeTeam.teamId}?action=${selectedAction}&limit=100`
-      );
-      setLogs(res.data?.logs || []);
-    } catch (err) {
-      console.error('Failed to load activity logs:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   useEffect(() => {
+    let isMounted = true;
+    if (!activeTeam) return;
+
+    const fetchLogs = async () => {
+      try {
+        const res = await api.get(
+          `/activity/${activeTeam.teamId}?action=${selectedAction}&limit=100`
+        );
+        if (isMounted) {
+          setLogs(res.data?.logs || []);
+        }
+      } catch (err) {
+        console.error('Failed to load activity logs:', err);
+      }
+    };
+
     fetchLogs();
-  }, [activeTeam?.teamId, selectedAction]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [activeTeam, selectedAction]);
 
   const getActionBadge = (action: string) => {
     switch (action) {

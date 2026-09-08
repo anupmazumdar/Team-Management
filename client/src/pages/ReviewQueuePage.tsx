@@ -6,12 +6,7 @@ import { ReviewModal } from '../components/tasks/ReviewModal';
 import {
   ShieldCheck,
   CheckCircle2,
-  AlertTriangle,
-  Clock,
-  Eye,
-  Send,
   User,
-  ArrowRight,
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -23,23 +18,28 @@ export const ReviewQueuePage: React.FC<ReviewQueuePageProps> = ({ onSelectTask }
   const { activeTeam, activeRole } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [selectedReviewTask, setSelectedReviewTask] = useState<Task | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-
-  const fetchReviewQueue = async () => {
-    setLoading(true);
-    try {
-      const res = await api.get('/tasks?reviewQueue=true');
-      setTasks(res.data || []);
-    } catch (err) {
-      console.error('Failed to load review queue:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [refreshKey, setRefreshKey] = useState<number>(0);
 
   useEffect(() => {
-    fetchReviewQueue();
-  }, [activeTeam?.teamId]);
+    let isMounted = true;
+    if (!activeTeam) return;
+
+    const loadReviewQueue = async () => {
+      try {
+        const res = await api.get('/tasks?reviewQueue=true');
+        if (isMounted) {
+          setTasks(res.data || []);
+        }
+      } catch (err) {
+        console.error('Failed to load review queue:', err);
+      }
+    };
+
+    loadReviewQueue();
+    return () => {
+      isMounted = false;
+    };
+  }, [activeTeam, refreshKey]);
 
   return (
     <div className="space-y-6">
@@ -138,7 +138,7 @@ export const ReviewQueuePage: React.FC<ReviewQueuePageProps> = ({ onSelectTask }
           isOpen={!!selectedReviewTask}
           onClose={() => setSelectedReviewTask(null)}
           task={selectedReviewTask}
-          onReviewSubmitted={() => fetchReviewQueue()}
+          onReviewSubmitted={() => setRefreshKey((prev) => prev + 1)}
         />
       )}
     </div>

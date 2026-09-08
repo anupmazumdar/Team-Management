@@ -88,7 +88,6 @@ export const StateMachineStepper: React.FC<StateMachineStepperProps> = ({ curren
           const Icon = step.icon;
           const isPassed = !isChangesRequired && idx < currentIndex;
           const isCurrent = !isChangesRequired && idx === currentIndex;
-          const isUpcoming = !isChangesRequired && idx > currentIndex;
 
           return (
             <div key={step.key} className="relative z-10 flex flex-col items-center group">

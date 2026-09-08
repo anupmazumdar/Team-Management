@@ -6,7 +6,6 @@ import {
   MessageSquare,
   ShieldCheck,
   User,
-  Paperclip,
   Target,
   CheckCircle2,
   AlertTriangle,

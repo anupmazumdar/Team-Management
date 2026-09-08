@@ -1,9 +1,29 @@
 import { Router, Request, Response } from 'express';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../config/db.js';
 import { authenticateToken, requireTeamRole } from '../middleware/auth.js';
 import { logActivity } from '../utils/logger.js';
 
 export const projectRouter = Router();
+
+type ProjectWithMetricsPayload = Prisma.ProjectGetPayload<{
+  include: {
+    createdBy: {
+      select: { id: true; fullName: true; avatarUrl: true };
+    };
+    tasks: {
+      select: { id: true; status: true; priority: true };
+    };
+    _count: {
+      select: {
+        tasks: true;
+        messages: true;
+      };
+    };
+  };
+}>;
+
+type ProjectTaskItem = ProjectWithMetricsPayload['tasks'][number];
 
 projectRouter.use(authenticateToken);
 
@@ -31,10 +51,10 @@ projectRouter.get('/', requireTeamRole(['admin', 'lead', 'member']), async (req:
       orderBy: { createdAt: 'desc' },
     });
 
-    const projectsWithMetrics = projects.map((p) => {
+    const projectsWithMetrics = projects.map((p: ProjectWithMetricsPayload) => {
       const totalTasks = p.tasks.length;
-      const completedTasks = p.tasks.filter((t) => t.status === 'APPROVED').length;
-      const inProgressTasks = p.tasks.filter((t) => ['IN_PROGRESS', 'SUBMITTED', 'UNDER_REVIEW'].includes(t.status)).length;
+      const completedTasks = p.tasks.filter((t: ProjectTaskItem) => t.status === 'APPROVED').length;
+      const inProgressTasks = p.tasks.filter((t: ProjectTaskItem) => ['IN_PROGRESS', 'SUBMITTED', 'UNDER_REVIEW'].includes(t.status)).length;
       const progressPercentage = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
       return {

@@ -6,8 +6,6 @@ import {
   FolderKanban,
   Plus,
   MessageSquare,
-  CheckCircle2,
-  Clock,
   ArrowRight,
   X,
 } from 'lucide-react';
@@ -22,26 +20,31 @@ export const ProjectsPage: React.FC<ProjectsPageProps> = ({ onSelectProject }) =
   const [showCreateModal, setShowCreateModal] = useState<boolean>(false);
   const [name, setName] = useState<string>('');
   const [description, setDescription] = useState<string>('');
-  const [loading, setLoading] = useState<boolean>(true);
+  const [refreshKey, setRefreshKey] = useState<number>(0);
 
   const isAdminOrLead = activeRole === 'admin' || activeRole === 'lead';
 
-  const fetchProjects = async () => {
-    if (!activeTeam) return;
-    setLoading(true);
-    try {
-      const res = await api.get('/projects');
-      setProjects(res.data || []);
-    } catch (err) {
-      console.error('Failed to load projects:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
+    let isMounted = true;
+    if (!activeTeam) return;
+
+    const fetchProjects = async () => {
+      try {
+        const res = await api.get('/projects');
+        if (isMounted) {
+          setProjects(res.data || []);
+        }
+      } catch (err) {
+        console.error('Failed to load projects:', err);
+      }
+    };
+
     fetchProjects();
-  }, [activeTeam?.teamId]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [activeTeam, refreshKey]);
 
   const handleCreateProject = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,7 +55,7 @@ export const ProjectsPage: React.FC<ProjectsPageProps> = ({ onSelectProject }) =
       setShowCreateModal(false);
       setName('');
       setDescription('');
-      await fetchProjects();
+      setRefreshKey((k) => k + 1);
     } catch (err) {
       console.error('Failed to create project:', err);
     }

@@ -6,11 +6,8 @@ import { Message, User } from '../../types';
 import {
   Send,
   Sparkles,
-  Paperclip,
   CheckCircle2,
   AlertTriangle,
-  AtSign,
-  Smile,
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -48,7 +45,7 @@ export const ChatBox: React.FC<ChatBoxProps> = ({ projectId, projectName, member
     return () => {
       leaveProject(projectId);
     };
-  }, [projectId]);
+  }, [projectId, joinProject, leaveProject]);
 
   // Socket listener for new messages & typing
   useEffect(() => {

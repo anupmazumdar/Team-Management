@@ -55,21 +55,21 @@ export const SocialAuthModal: React.FC<SocialAuthModalProps> = ({
     }
   };
 
+  const [prevProvider, setPrevProvider] = useState<SocialProvider | null>(provider);
   const defaults = getDefaults(provider);
   const [email, setEmail] = useState<string>(defaults.email);
   const [fullName, setFullName] = useState<string>(defaults.name);
   const [headline, setHeadline] = useState<string>(defaults.headline);
   const [tab, setTab] = useState<'instant' | 'live'>('instant');
 
-  // Reset fields when provider changes
-  React.useEffect(() => {
-    if (provider) {
-      const d = getDefaults(provider);
-      setEmail(d.email);
-      setFullName(d.name);
-      setHeadline(d.headline);
-    }
-  }, [provider]);
+  // Reset fields during render when provider changes
+  if (provider !== prevProvider) {
+    setPrevProvider(provider);
+    const d = getDefaults(provider);
+    setEmail(d.email);
+    setFullName(d.name);
+    setHeadline(d.headline);
+  }
 
   if (!isOpen || !provider) return null;
 

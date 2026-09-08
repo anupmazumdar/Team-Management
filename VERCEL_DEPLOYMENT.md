@@ -32,8 +32,8 @@ Under **Environment Variables**, configure:
 |---|---|---|
 | `VITE_API_URL` | `https://your-backend.onrender.com/api` | Live backend API URL on Render |
 | `VITE_WS_URL` | `https://your-backend.onrender.com` | Live Socket.IO WebSocket URL on Render |
-| `VITE_AUTH0_DOMAIN` | `your-tenant.us.auth0.com` | (Optional) Auth0 SSO Domain |
-| `VITE_AUTH0_CLIENT_ID` | `your-auth0-client-id` | (Optional) Auth0 SPA Client ID |
+| `VITE_GOOGLE_CLIENT_ID` | `your-google-client-id.apps.googleusercontent.com` | (Optional) Google OAuth Client ID |
+| `VITE_GITHUB_CLIENT_ID` | `your-github-client-id` | (Optional) GitHub OAuth Client ID |
 
 ### Step 4: Deploy
 Click **"Deploy"**. Vercel will run the build command from root and deploy the compiled `client/dist` bundle.

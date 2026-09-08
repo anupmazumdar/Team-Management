@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Layers, Lock, Mail, Loader2 } from 'lucide-react';
 import { SocialAuthModal, SocialProvider } from '../components/common/SocialAuthModal';
@@ -16,21 +16,21 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
   const [socialLoading, setSocialLoading] = useState<boolean>(false);
   const isAnyLoading = emailLoading || socialLoading;
 
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(() => {
+    if (typeof window !== 'undefined' && window.location.hash) {
+      const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+      const errorParam = hashParams.get('error');
+      const errorDesc = hashParams.get('error_description');
+      if (errorParam) {
+        window.history.replaceState({}, document.title, window.location.pathname);
+        return `Google Sign-In: ${errorDesc || errorParam}. (Ensure https://team-management-server-pied.vercel.app is added to Authorized redirect URIs in Google Cloud Console)`;
+      }
+    }
+    return null;
+  });
   const [socialModalProvider, setSocialModalProvider] = useState<SocialProvider | null>(null);
 
-  // Check for GitHub OAuth ?code= parameter on redirect
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const ghCode = urlParams.get('code');
-    const state = urlParams.get('state');
-    if (ghCode && (state === 'github_oauth' || !state)) {
-      window.history.replaceState({}, document.title, window.location.pathname);
-      handleGitHubCodeExchange(ghCode);
-    }
-  }, []);
-
-  const handleGitHubCodeExchange = async (code: string) => {
+  const handleGitHubCodeExchange = useCallback(async (code: string) => {
     setSocialLoading(true);
     setError(null);
     try {
@@ -50,10 +50,23 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
     } finally {
       setSocialLoading(false);
     }
-  };
+  }, [loginWithGitHubCode]);
 
+  // Check for GitHub OAuth ?code= parameter on redirect
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const ghCode = urlParams.get('code');
+    const state = urlParams.get('state');
+    if (ghCode && (state === 'github_oauth' || !state)) {
+      window.history.replaceState({}, document.title, window.location.pathname);
+      const timer = setTimeout(() => {
+        handleGitHubCodeExchange(ghCode);
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, [handleGitHubCodeExchange]);
 
-  const handleSocialSync = async (data: {
+  const handleSocialSync = useCallback(async (data: {
     provider: SocialProvider;
     providerId: string;
     email: string;
@@ -76,35 +89,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
     } finally {
       setSocialLoading(false);
     }
-  };
+  }, [loginWithSocial]);
 
   const GOOGLE_CLIENT_ID =
     import.meta.env.VITE_GOOGLE_CLIENT_ID ||
     '612857418194-j68nke48tjglhvtdql05s8s7tfj4bhpe.apps.googleusercontent.com';
 
-  // Check for Google OAuth redirect in URL hash (#access_token=...)
-  useEffect(() => {
-    if (typeof window !== 'undefined' && window.location.hash) {
-      const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
-      const accessToken = hashParams.get('access_token');
-      const state = hashParams.get('state');
-      const errorParam = hashParams.get('error');
-      const errorDesc = hashParams.get('error_description');
-
-      if (errorParam) {
-        window.history.replaceState({}, document.title, window.location.pathname);
-        setError(`Google Sign-In: ${errorDesc || errorParam}. (Ensure https://team-management-server-pied.vercel.app is added to Authorized redirect URIs in Google Cloud Console)`);
-        return;
-      }
-
-      if (accessToken && state === 'google_oauth') {
-        window.history.replaceState({}, document.title, window.location.pathname);
-        handleGoogleTokenSuccess(accessToken);
-      }
-    }
-  }, []);
-
-  const handleGoogleTokenSuccess = async (accessToken: string) => {
+  const handleGoogleTokenSuccess = useCallback(async (accessToken: string) => {
     setSocialLoading(true);
     setError(null);
     try {
@@ -133,7 +124,24 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
     } finally {
       setSocialLoading(false);
     }
-  };
+  }, [handleSocialSync]);
+
+  // Check for Google OAuth redirect in URL hash (#access_token=...)
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.hash) {
+      const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+      const accessToken = hashParams.get('access_token');
+      const state = hashParams.get('state');
+
+      if (accessToken && state === 'google_oauth') {
+        window.history.replaceState({}, document.title, window.location.pathname);
+        const timer = setTimeout(() => {
+          handleGoogleTokenSuccess(accessToken);
+        }, 0);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [handleGoogleTokenSuccess]);
 
   // Direct full-page OAuth redirect (100% immune to AdBlock & popup blockers)
   const handleGoogleRealSignIn = () => {

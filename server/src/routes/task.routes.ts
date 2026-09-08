@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../config/db.js';
 import { authenticateToken, requireTeamRole } from '../middleware/auth.js';
 import { validateStateTransition, TaskStatus, STATUS_LABELS } from '../utils/stateMachine.js';
@@ -6,6 +7,18 @@ import { logActivity, createNotification } from '../utils/logger.js';
 import { broadcastSystemMessage } from '../socket/socketHandler.js';
 
 export const taskRouter = Router();
+
+export interface ChecklistItemInput {
+  id?: string;
+  text?: string;
+  completed?: boolean;
+}
+
+export interface TaskChecklistItem {
+  id: string;
+  text: string;
+  completed: boolean;
+}
 
 taskRouter.use(authenticateToken);
 
@@ -163,11 +176,11 @@ taskRouter.post('/', requireTeamRole(['admin', 'lead', 'member']), async (req: R
         reviewerId: reviewerId || null,
         createdById: req.user!.id,
         checklist: Array.isArray(checklist)
-          ? checklist.map((item: any, idx: number) => ({
-              id: item.id || `chk-${Date.now()}-${idx}`,
-              text: typeof item === 'string' ? item : item.text,
-              completed: !!item.completed,
-            }))
+          ? (checklist.map((item: string | ChecklistItemInput, idx: number): TaskChecklistItem => ({
+              id: (typeof item === 'object' && item && 'id' in item && typeof item.id === 'string' ? item.id : `chk-${Date.now()}-${idx}`),
+              text: (typeof item === 'string' ? item : (item && typeof item === 'object' && 'text' in item && typeof item.text === 'string' ? item.text : '')),
+              completed: Boolean(typeof item === 'object' && item && 'completed' in item && item.completed),
+            })) as unknown as Prisma.InputJsonValue)
           : [],
       },
       include: {
@@ -334,8 +347,8 @@ taskRouter.put('/:taskId/checklist/:itemId', requireTeamRole(['admin', 'lead', '
       return res.status(404).json({ error: 'Task not found.' });
     }
 
-    const checklist = Array.isArray(task.checklist) ? (task.checklist as any[]) : [];
-    const updatedChecklist = checklist.map((item) => {
+    const checklist = Array.isArray(task.checklist) ? (task.checklist as unknown as TaskChecklistItem[]) : [];
+    const updatedChecklist = checklist.map((item: TaskChecklistItem): TaskChecklistItem => {
       if (item.id === itemId) {
         return {
           ...item,
@@ -348,7 +361,7 @@ taskRouter.put('/:taskId/checklist/:itemId', requireTeamRole(['admin', 'lead', '
 
     const updated = await prisma.task.update({
       where: { id: taskId },
-      data: { checklist: updatedChecklist },
+      data: { checklist: updatedChecklist as unknown as Prisma.InputJsonValue },
     });
 
     return res.json(updated);

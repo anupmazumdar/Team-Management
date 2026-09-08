@@ -60,10 +60,8 @@ Not Started ➔ In Progress ➔ Submitted ➔ Under Review ➔ Approved
 
 ### Social & SSO Authenticators
 The login interface supports:
-- **Auth0 SSO**: Enterprise OpenID Connect / OAuth 2.0 with backend database sync
-- **Google Authenticator**: Instant verified profile + OAuth redirect
-- **GitHub Authenticator**: Developer identity + OAuth redirect
-- **LinkedIn Authenticator**: Professional profile + OAuth redirect
+- **Google Authenticator**: Instant verified profile + OAuth 2.0 direct redirect
+- **GitHub Authenticator**: Developer identity + OAuth 2.0 direct redirect
 
 All authenticators automatically persist profiles in the PostgreSQL database and link members to the primary workspace.
 

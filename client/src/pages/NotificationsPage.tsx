@@ -1,28 +1,30 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
 import { Notification } from '../types';
-import { Bell, CheckCircle2, ShieldCheck, MessageSquare, Clock } from 'lucide-react';
 import { format } from 'date-fns';
 
 export const NotificationsPage: React.FC = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadOnly, setUnreadOnly] = useState<boolean>(false);
-  const [loading, setLoading] = useState<boolean>(true);
-
-  const fetchNotifications = async () => {
-    setLoading(true);
-    try {
-      const res = await api.get('/notifications');
-      setNotifications(res.data?.notifications || []);
-    } catch (err) {
-      console.error('Failed to load notifications:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   useEffect(() => {
+    let isMounted = true;
+    const fetchNotifications = async () => {
+      try {
+        const res = await api.get('/notifications');
+        if (isMounted) {
+          setNotifications(res.data?.notifications || []);
+        }
+      } catch (err) {
+        console.error('Failed to load notifications:', err);
+      }
+    };
+
     fetchNotifications();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const markAllRead = async () => {

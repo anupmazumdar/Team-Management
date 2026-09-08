@@ -8,7 +8,6 @@ import {
   Plus,
   LayoutGrid,
   List,
-  Filter,
   Search,
   CheckCircle2,
   PlayCircle,
@@ -37,31 +36,36 @@ export const AllTasksPage: React.FC<AllTasksPageProps> = ({ onSelectTask }) => {
   const [searchQuery, setSearchQuery] = useState<string>('');
 
   const [showCreateModal, setShowCreateModal] = useState<boolean>(false);
-  const [loading, setLoading] = useState<boolean>(true);
-
-  const fetchTasksAndFilters = async () => {
-    if (!activeTeam) return;
-    setLoading(true);
-    try {
-      const [tasksRes, projectsRes, teamRes] = await Promise.all([
-        api.get('/tasks'),
-        api.get('/projects'),
-        api.get(`/teams/${activeTeam.teamId}`),
-      ]);
-
-      setTasks(tasksRes.data || []);
-      setProjects(projectsRes.data || []);
-      setMembers(teamRes.data?.members || []);
-    } catch (err) {
-      console.error('Failed to load tasks:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [refreshKey, setRefreshKey] = useState<number>(0);
 
   useEffect(() => {
-    fetchTasksAndFilters();
-  }, [activeTeam?.teamId]);
+    let isMounted = true;
+    if (!activeTeam) return;
+
+    const loadTasksAndFilters = async () => {
+      try {
+        const [tasksRes, projectsRes, teamRes] = await Promise.all([
+          api.get('/tasks'),
+          api.get('/projects'),
+          api.get(`/teams/${activeTeam.teamId}`),
+        ]);
+
+        if (isMounted) {
+          setTasks(tasksRes.data || []);
+          setProjects(projectsRes.data || []);
+          setMembers(teamRes.data?.members || []);
+        }
+      } catch (err) {
+        console.error('Failed to load tasks:', err);
+      }
+    };
+
+    loadTasksAndFilters();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [activeTeam, refreshKey]);
 
   // Apply Client-Side Combinable Filters
   const filteredTasks = tasks.filter((task) => {
@@ -313,7 +317,7 @@ export const AllTasksPage: React.FC<AllTasksPageProps> = ({ onSelectTask }) => {
         <TaskModal
           isOpen={showCreateModal}
           onClose={() => setShowCreateModal(false)}
-          onTaskCreated={fetchTasksAndFilters}
+          onTaskCreated={() => setRefreshKey((prev) => prev + 1)}
           projects={projects}
           members={members}
         />

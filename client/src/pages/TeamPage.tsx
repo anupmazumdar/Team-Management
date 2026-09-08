@@ -5,14 +5,10 @@ import { TeamMemberWithStats } from '../types';
 import { RoleChangeModal } from '../components/team/RoleChangeModal';
 import { RemoveMemberModal } from '../components/team/RemoveMemberModal';
 import {
-  Users,
   UserPlus,
   Shield,
   Briefcase,
   UserMinus,
-  CheckCircle2,
-  Clock,
-  Percent,
   X,
 } from 'lucide-react';
 
@@ -24,29 +20,35 @@ export const TeamPage: React.FC = () => {
   const [showInviteModal, setShowInviteModal] = useState<boolean>(false);
   const [inviteEmail, setInviteEmail] = useState<string>('');
   const [inviteRole, setInviteRole] = useState<'admin' | 'lead' | 'member'>('member');
-  const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState<number>(0);
 
   const isAdmin = activeRole === 'admin';
   const isAdminOrLead = activeRole === 'admin' || activeRole === 'lead';
 
-  const fetchTeamMembers = async () => {
-    if (!activeTeam) return;
-    setLoading(true);
-    try {
-      const res = await api.get(`/teams/${activeTeam.teamId}`);
-      setMembers(res.data?.members || []);
-    } catch (err: any) {
-      console.error('Failed to load team members:', err);
-      setError(err.response?.data?.error || 'Failed to load members');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    fetchTeamMembers();
-  }, [activeTeam?.teamId]);
+    let isMounted = true;
+    if (!activeTeam) return;
+
+    const loadTeamMembers = async () => {
+      try {
+        const res = await api.get(`/teams/${activeTeam.teamId}`);
+        if (isMounted) {
+          setMembers(res.data?.members || []);
+        }
+      } catch (err: any) {
+        console.error('Failed to load team members:', err);
+        if (isMounted) {
+          setError(err.response?.data?.error || 'Failed to load members');
+        }
+      }
+    };
+
+    loadTeamMembers();
+    return () => {
+      isMounted = false;
+    };
+  }, [activeTeam, refreshKey]);
 
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,7 +61,7 @@ export const TeamPage: React.FC = () => {
       });
       setShowInviteModal(false);
       setInviteEmail('');
-      await fetchTeamMembers();
+      setRefreshKey((k) => k + 1);
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to invite member');
     }
@@ -237,7 +239,7 @@ export const TeamPage: React.FC = () => {
           onClose={() => setSelectedForRoleChange(null)}
           member={selectedForRoleChange}
           teamId={activeTeam!.teamId}
-          onRoleChanged={fetchTeamMembers}
+          onRoleChanged={() => setRefreshKey((k) => k + 1)}
         />
       )}
 
@@ -249,7 +251,7 @@ export const TeamPage: React.FC = () => {
           member={selectedForRemoval}
           otherMembers={members.filter((m) => m.userId !== selectedForRemoval.userId)}
           teamId={activeTeam!.teamId}
-          onMemberRemoved={fetchTeamMembers}
+          onMemberRemoved={() => setRefreshKey((k) => k + 1)}
         />
       )}
 

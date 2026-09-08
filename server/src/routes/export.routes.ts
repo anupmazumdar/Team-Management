@@ -1,8 +1,38 @@
 import { Router, Request, Response } from 'express';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../config/db.js';
 import { authenticateToken } from '../middleware/auth.js';
 
 export const exportRouter = Router();
+
+type WorkspaceTeamMember = Prisma.TeamMemberGetPayload<{
+  include: {
+    user: {
+      select: { id: true; email: true; fullName: true; title: true; avatarUrl: true; authProvider: true };
+    };
+  };
+}>;
+
+type ExportTaskItem = Prisma.TaskGetPayload<{
+  include: {
+    project: { select: { name: true } };
+    assignedTo: { select: { fullName: true; email: true } };
+    reviewer: { select: { fullName: true; email: true } };
+    createdBy: { select: { fullName: true } };
+  };
+}>;
+
+type ScorecardMember = Prisma.TeamMemberGetPayload<{
+  include: {
+    user: { select: { fullName: true; email: true; title: true; authProvider: true } };
+  };
+}>;
+
+type ActivityLogItem = Prisma.ActivityLogGetPayload<{
+  include: {
+    actor: { select: { fullName: true; email: true } };
+  };
+}>;
 
 // Helper to escape CSV fields
 function escapeCsv(val: any): string {
@@ -69,7 +99,7 @@ exportRouter.get('/workspace', authenticateToken, async (req: Request, res: Resp
         description: team.description,
         createdAt: team.createdAt,
       },
-      members: team.members.map((m) => ({
+      members: team.members.map((m: WorkspaceTeamMember) => ({
         id: m.id,
         role: m.role,
         joinedAt: m.joinedAt,
@@ -133,7 +163,7 @@ exportRouter.get('/tasks', authenticateToken, async (req: Request, res: Response
       'Description',
     ];
 
-    const rows = tasks.map((t) => [
+    const rows = tasks.map((t: ExportTaskItem) => [
       escapeCsv(t.id),
       escapeCsv(t.title),
       escapeCsv(t.project?.name || ''),
@@ -153,7 +183,7 @@ exportRouter.get('/tasks', authenticateToken, async (req: Request, res: Response
       escapeCsv(t.description || ''),
     ]);
 
-    const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const csvContent = [headers.join(','), ...rows.map((r: (string | number)[]) => r.join(','))].join('\n');
 
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', `attachment; filename="tasks-export-${Date.now()}.csv"`);
@@ -195,7 +225,7 @@ exportRouter.get('/team', authenticateToken, async (req: Request, res: Response)
     ];
 
     const rows = await Promise.all(
-      members.map(async (m) => {
+      members.map(async (m: ScorecardMember) => {
         const assigned = await prisma.task.count({ where: { teamId, assignedToId: m.userId } });
         const completed = await prisma.task.count({ where: { teamId, assignedToId: m.userId, status: 'APPROVED' } });
         const pending = await prisma.task.count({
@@ -237,7 +267,7 @@ exportRouter.get('/team', authenticateToken, async (req: Request, res: Response)
       })
     );
 
-    const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const csvContent = [headers.join(','), ...rows.map((r: (string | number)[]) => r.join(','))].join('\n');
 
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', `attachment; filename="team-scorecard-${Date.now()}.csv"`);
@@ -268,7 +298,7 @@ exportRouter.get('/activity', authenticateToken, async (req: Request, res: Respo
 
     const headers = ['Timestamp', 'Action', 'Actor Name', 'Actor Email', 'Details'];
 
-    const rows = logs.map((l) => [
+    const rows = logs.map((l: ActivityLogItem) => [
       escapeCsv(l.createdAt.toISOString()),
       escapeCsv(l.action),
       escapeCsv(l.actor.fullName),
@@ -276,7 +306,7 @@ exportRouter.get('/activity', authenticateToken, async (req: Request, res: Respo
       escapeCsv(JSON.stringify(l.details)),
     ]);
 
-    const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const csvContent = [headers.join(','), ...rows.map((r: (string | number)[]) => r.join(','))].join('\n');
 
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', `attachment; filename="activity-audit-${Date.now()}.csv"`);

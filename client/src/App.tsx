@@ -30,23 +30,28 @@ const MainWorkspace: React.FC = () => {
   const [isRegisterMode, setIsRegisterMode] = useState<boolean>(false);
 
   // Poll review queue count for leads/admins
-  const fetchReviewCount = async () => {
-    if (!activeTeam) return;
-    try {
-      const res = await api.get('/tasks?reviewQueue=true');
-      setReviewCount((res.data || []).length);
-    } catch (err) {
-      // ignore
-    }
-  };
-
   useEffect(() => {
-    if (activeTeam) {
-      fetchReviewCount();
-      const interval = setInterval(fetchReviewCount, 15000);
-      return () => clearInterval(interval);
-    }
-  }, [activeTeam?.teamId]);
+    if (!activeTeam) return;
+    let isMounted = true;
+
+    const loadReviewCount = async () => {
+      try {
+        const res = await api.get('/tasks?reviewQueue=true');
+        if (isMounted) {
+          setReviewCount((res.data || []).length);
+        }
+      } catch {
+        // ignore
+      }
+    };
+
+    loadReviewCount();
+    const interval = setInterval(loadReviewCount, 15000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [activeTeam]);
 
   if (loading) {
     return (

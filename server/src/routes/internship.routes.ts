@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { InternshipPeriod } from '@prisma/client';
 import { prisma } from '../config/db.js';
 import { authenticateToken, requireTeamRole } from '../middleware/auth.js';
 import { logActivity } from '../utils/logger.js';
@@ -6,6 +7,13 @@ import { logActivity } from '../utils/logger.js';
 export const internshipRouter = Router();
 
 internshipRouter.use(authenticateToken);
+
+interface MilestoneItem {
+  id: string;
+  title: string;
+  completed: boolean;
+  dueDate?: string;
+}
 
 // Get 6-month internship roadmap for team
 internshipRouter.get('/:teamId', requireTeamRole(['admin', 'lead', 'member']), async (req: Request, res: Response) => {
@@ -18,14 +26,14 @@ internshipRouter.get('/:teamId', requireTeamRole(['admin', 'lead', 'member']), a
     });
 
     // Compute overall statistics across all 6 months
-    const totalMilestones = periods.reduce((acc, p) => {
-      const ms = Array.isArray(p.milestones) ? (p.milestones as any[]) : [];
+    const totalMilestones = periods.reduce((acc: number, p: InternshipPeriod) => {
+      const ms = Array.isArray(p.milestones) ? (p.milestones as unknown as MilestoneItem[]) : [];
       return acc + ms.length;
     }, 0);
 
-    const completedMilestones = periods.reduce((acc, p) => {
-      const ms = Array.isArray(p.milestones) ? (p.milestones as any[]) : [];
-      return acc + ms.filter((m) => m.completed).length;
+    const completedMilestones = periods.reduce((acc: number, p: InternshipPeriod) => {
+      const ms = Array.isArray(p.milestones) ? (p.milestones as unknown as MilestoneItem[]) : [];
+      return acc + ms.filter((m: MilestoneItem) => m.completed).length;
     }, 0);
 
     const overallPercentage = totalMilestones > 0 ? Math.round((completedMilestones / totalMilestones) * 100) : 0;
@@ -61,8 +69,9 @@ internshipRouter.put('/:teamId/:periodId', requireTeamRole(['admin', 'lead']), a
     // Auto-calculate completion percentage from milestones if provided
     let calculatedPercentage = completionPercentage;
     if (milestones && Array.isArray(milestones) && completionPercentage === undefined) {
-      const completedCount = milestones.filter((m: any) => m.completed).length;
-      calculatedPercentage = milestones.length > 0 ? Math.round((completedCount / milestones.length) * 100) : 0;
+      const msList = milestones as MilestoneItem[];
+      const completedCount = msList.filter((m: MilestoneItem) => m.completed).length;
+      calculatedPercentage = msList.length > 0 ? Math.round((completedCount / msList.length) * 100) : 0;
     }
 
     // Determine status automatically if complete

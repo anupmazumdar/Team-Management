@@ -12,32 +12,36 @@ export const InternshipTimelinePage: React.FC = () => {
     completedMilestones: number;
     overallPercentage: number;
   }>({ totalMilestones: 0, completedMilestones: 0, overallPercentage: 0 });
-  const [loading, setLoading] = useState<boolean>(true);
-
-  const fetchRoadmap = async () => {
-    if (!activeTeam) return;
-    setLoading(true);
-    try {
-      const res = await api.get(`/internship/${activeTeam.teamId}`);
-      setPeriods(res.data?.periods || []);
-      setStats(res.data?.stats || { totalMilestones: 0, completedMilestones: 0, overallPercentage: 0 });
-    } catch (err) {
-      console.error('Failed to load internship roadmap:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [refreshKey, setRefreshKey] = useState<number>(0);
 
   useEffect(() => {
-    fetchRoadmap();
-  }, [activeTeam?.teamId]);
+    let isMounted = true;
+    if (!activeTeam) return;
+
+    const loadRoadmap = async () => {
+      try {
+        const res = await api.get(`/internship/${activeTeam.teamId}`);
+        if (isMounted) {
+          setPeriods(res.data?.periods || []);
+          setStats(res.data?.stats || { totalMilestones: 0, completedMilestones: 0, overallPercentage: 0 });
+        }
+      } catch (err) {
+        console.error('Failed to load internship roadmap:', err);
+      }
+    };
+
+    loadRoadmap();
+    return () => {
+      isMounted = false;
+    };
+  }, [activeTeam, refreshKey]);
 
   return (
     <div className="space-y-6">
       <InternshipTracker
         periods={periods}
         stats={stats}
-        onUpdate={fetchRoadmap}
+        onUpdate={() => setRefreshKey((k) => k + 1)}
       />
     </div>
   );

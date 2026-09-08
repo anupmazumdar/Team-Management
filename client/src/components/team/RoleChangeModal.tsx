@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { api } from '../../services/api';
 import { TeamMemberWithStats, TeamRole } from '../../types';
-import { X, Shield, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { X, Shield, AlertTriangle } from 'lucide-react';
 
 interface RoleChangeModalProps {
   isOpen: boolean;

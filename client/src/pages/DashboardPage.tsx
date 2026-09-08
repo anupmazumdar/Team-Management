@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
-import { Task, InternshipPeriod, ActivityLog } from '../types';
+import { Task, ActivityLog } from '../types';
 import {
   CheckCircle2,
-  Clock,
   AlertTriangle,
   PlayCircle,
   CircleDashed,
@@ -31,31 +30,35 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ setCurrentTab, onS
     overallPercentage: number;
   }>({ totalMilestones: 0, completedMilestones: 0, overallPercentage: 0 });
   const [recentActivity, setRecentActivity] = useState<ActivityLog[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-
-  const loadDashboardData = async () => {
-    if (!activeTeam) return;
-    setLoading(true);
-    try {
-      const [tasksRes, internRes, actRes] = await Promise.all([
-        api.get('/tasks'),
-        api.get(`/internship/${activeTeam.teamId}`),
-        api.get(`/activity/${activeTeam.teamId}?limit=6`),
-      ]);
-
-      setTasks(tasksRes.data || []);
-      setInternshipStats(internRes.data?.stats || { totalMilestones: 0, completedMilestones: 0, overallPercentage: 0 });
-      setRecentActivity(actRes.data?.logs || []);
-    } catch (err) {
-      console.error('Failed to load dashboard data:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   useEffect(() => {
+    let isMounted = true;
+    if (!activeTeam) return;
+
+    const loadDashboardData = async () => {
+      try {
+        const [tasksRes, internRes, actRes] = await Promise.all([
+          api.get('/tasks'),
+          api.get(`/internship/${activeTeam.teamId}`),
+          api.get(`/activity/${activeTeam.teamId}?limit=6`),
+        ]);
+
+        if (isMounted) {
+          setTasks(tasksRes.data || []);
+          setInternshipStats(internRes.data?.stats || { totalMilestones: 0, completedMilestones: 0, overallPercentage: 0 });
+          setRecentActivity(actRes.data?.logs || []);
+        }
+      } catch (err) {
+        console.error('Failed to load dashboard data:', err);
+      }
+    };
+
     loadDashboardData();
-  }, [activeTeam?.teamId]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [activeTeam]);
 
   // Compute status counts
   const counts = {

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
 import { Task } from '../types';
-import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import {
   format,
   startOfMonth,
@@ -22,24 +22,28 @@ export const CalendarPage: React.FC<CalendarPageProps> = ({ onSelectTask }) => {
   const { activeTeam } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
-  const [loading, setLoading] = useState<boolean>(true);
-
-  const fetchTasks = async () => {
-    if (!activeTeam) return;
-    setLoading(true);
-    try {
-      const res = await api.get('/tasks');
-      setTasks(res.data || []);
-    } catch (err) {
-      console.error('Failed to load tasks for calendar:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   useEffect(() => {
+    let isMounted = true;
+    if (!activeTeam) return;
+
+    const fetchTasks = async () => {
+      try {
+        const res = await api.get('/tasks');
+        if (isMounted) {
+          setTasks(res.data || []);
+        }
+      } catch (err) {
+        console.error('Failed to load tasks for calendar:', err);
+      }
+    };
+
     fetchTasks();
-  }, [activeTeam?.teamId]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [activeTeam]);
 
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);

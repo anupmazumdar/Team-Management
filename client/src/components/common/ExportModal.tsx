@@ -61,7 +61,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, teamN
             <div>
               <h2 className="text-base font-bold text-white">Export Workspace Data</h2>
               <p className="text-xs text-slate-400 mt-0.5">
-                Download database records, deliverables, and performance audit logs.
+                Download database records, deliverables, and audit logs for {teamName}.
               </p>
             </div>
           </div>

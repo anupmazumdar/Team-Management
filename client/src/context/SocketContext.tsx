@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useAuth } from './AuthContext';
 
@@ -19,13 +19,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [connected, setConnected] = useState<boolean>(false);
 
   useEffect(() => {
-    if (!token) {
-      if (socket) {
-        socket.disconnect();
-        setSocket(null);
-      }
-      return;
-    }
+    if (!token) return;
 
     const defaultWsUrl = import.meta.env.DEV
       ? '/'
@@ -38,35 +32,44 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     newSocket.on('connect', () => {
       setConnected(true);
-      if (activeTeam) {
-        newSocket.emit('join-team', activeTeam.teamId);
-      }
     });
 
     newSocket.on('disconnect', () => {
       setConnected(false);
     });
 
-    setSocket(newSocket);
+    const timer = setTimeout(() => {
+      setSocket(newSocket);
+    }, 0);
 
     return () => {
+      clearTimeout(timer);
       newSocket.disconnect();
+      setSocket(null);
+      setConnected(false);
     };
-  }, [token, activeTeam?.teamId]);
+  }, [token]);
 
-  const joinProject = (projectId: string) => {
+  // Join active team room whenever socket connects or active team changes
+  useEffect(() => {
+    if (socket && connected && activeTeam?.teamId) {
+      socket.emit('join-team', activeTeam.teamId);
+    }
+  }, [socket, connected, activeTeam?.teamId]);
+
+  const joinProject = useCallback((projectId: string) => {
     if (socket && connected) {
       socket.emit('join-project', projectId);
     }
-  };
+  }, [socket, connected]);
 
-  const leaveProject = (projectId: string) => {
+  const leaveProject = useCallback((projectId: string) => {
     if (socket && connected) {
       socket.emit('leave-project', projectId);
     }
-  };
+  }, [socket, connected]);
 
-  const sendMessage = (projectId: string, content: string, mentions: string[] = []) => {
+  const sendMessage = useCallback((projectId: string, content: string, mentions: string[] = []) => {
     if (socket && connected && activeTeam) {
       socket.emit('send-message', {
         projectId,
@@ -75,13 +78,13 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         mentions,
       });
     }
-  };
+  }, [socket, connected, activeTeam]);
 
-  const sendTyping = (projectId: string, isTyping: boolean) => {
+  const sendTyping = useCallback((projectId: string, isTyping: boolean) => {
     if (socket && connected) {
       socket.emit('typing', { projectId, isTyping });
     }
-  };
+  }, [socket, connected]);
 
   return (
     <SocketContext.Provider

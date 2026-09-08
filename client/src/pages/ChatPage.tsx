@@ -3,40 +3,42 @@ import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
 import { Project, TeamMemberWithStats } from '../types';
 import { ChatBox } from '../components/chat/ChatBox';
-import { MessageSquare, Hash, FolderKanban } from 'lucide-react';
+import { Hash } from 'lucide-react';
 
 export const ChatPage: React.FC = () => {
   const { activeTeam } = useAuth();
   const [projects, setProjects] = useState<Project[]>([]);
   const [members, setMembers] = useState<TeamMemberWithStats[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
-  const [loading, setLoading] = useState<boolean>(true);
-
-  const fetchChatData = async () => {
-    if (!activeTeam) return;
-    setLoading(true);
-    try {
-      const [projRes, teamRes] = await Promise.all([
-        api.get('/projects'),
-        api.get(`/teams/${activeTeam.teamId}`),
-      ]);
-
-      const projs: Project[] = projRes.data || [];
-      setProjects(projs);
-      setMembers(teamRes.data?.members || []);
-      if (projs.length > 0 && !selectedProjectId) {
-        setSelectedProjectId(projs[0].id);
-      }
-    } catch (err) {
-      console.error('Failed to load chat channels:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   useEffect(() => {
+    let isMounted = true;
+    if (!activeTeam) return;
+
+    const fetchChatData = async () => {
+      try {
+        const [projRes, teamRes] = await Promise.all([
+          api.get('/projects'),
+          api.get(`/teams/${activeTeam.teamId}`),
+        ]);
+
+        if (isMounted) {
+          const projs: Project[] = projRes.data || [];
+          setProjects(projs);
+          setMembers(teamRes.data?.members || []);
+          setSelectedProjectId((prev) => (projs.length > 0 && !prev ? projs[0].id : prev));
+        }
+      } catch (err) {
+        console.error('Failed to load chat channels:', err);
+      }
+    };
+
     fetchChatData();
-  }, [activeTeam?.teamId]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [activeTeam]);
 
   const activeProject = projects.find((p) => p.id === selectedProjectId) || projects[0];
 

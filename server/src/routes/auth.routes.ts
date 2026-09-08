@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../config/db.js';
 import { ENV } from '../config/env.js';
 import { authenticateToken } from '../middleware/auth.js';
@@ -10,6 +11,10 @@ export const authRouter = Router();
 export const ADMIN_EMAILS = ['thezeroanup0@gmail.com'];
 export const isAdmin = (email?: string | null) =>
   Boolean(email && ADMIN_EMAILS.includes(email.toLowerCase().trim()));
+
+type TeamMemberWithTeam = Prisma.TeamMemberGetPayload<{
+  include: { team: true };
+}>;
 
 // Register new user
 authRouter.post('/register', async (req: Request, res: Response) => {
@@ -111,7 +116,7 @@ authRouter.post('/login', async (req: Request, res: Response) => {
         title: user.title,
         avatarUrl: user.avatarUrl,
       },
-      teams: user.teamMembers.map((tm) => ({
+      teams: user.teamMembers.map((tm: TeamMemberWithTeam) => ({
         teamId: tm.teamId,
         teamName: tm.team.name,
         teamSlug: tm.team.slug,
@@ -150,11 +155,11 @@ authRouter.get('/me', authenticateToken, async (req: Request, res: Response) => 
         title: user.title,
         avatarUrl: user.avatarUrl,
       },
-      teams: user.teamMembers.map((tm) => ({
+      teams: user.teamMembers.map((tm: TeamMemberWithTeam) => ({
         teamId: tm.teamId,
         teamName: tm.team.name,
         teamSlug: tm.team.slug,
-        role: tm.role,
+        role: isAdmin(user.email) ? 'admin' : tm.role,
         joinedAt: tm.joinedAt,
       })),
     });
@@ -164,138 +169,7 @@ authRouter.get('/me', authenticateToken, async (req: Request, res: Response) => 
   }
 });
 
-// Auth0 User Sync & Provisioning
-authRouter.post('/auth0-sync', async (req: Request, res: Response) => {
-  try {
-    const { auth0Id, email, fullName, avatarUrl } = req.body;
-
-    if (!email) {
-      return res.status(400).json({ error: 'Email is required from Auth0 profile.' });
-    }
-
-    const cleanEmail = email.toLowerCase().trim();
-
-    // 1. Check if user already exists
-    let user = await prisma.user.findFirst({
-      where: {
-        OR: [
-          auth0Id ? { auth0Id } : {},
-          { email: cleanEmail },
-        ],
-      },
-      include: {
-        teamMembers: {
-          where: { removedAt: null },
-          include: { team: true },
-        },
-      },
-    });
-
-    if (user) {
-      // Update details and link auth0Id
-      user = await prisma.user.update({
-        where: { id: user.id },
-        data: {
-          auth0Id: auth0Id || user.auth0Id,
-          authProvider: 'auth0',
-          fullName: fullName?.trim() || user.fullName,
-          avatarUrl: avatarUrl || user.avatarUrl,
-        },
-        include: {
-          teamMembers: {
-            where: { removedAt: null },
-            include: { team: true },
-          },
-        },
-      });
-
-      if (isAdmin(cleanEmail)) {
-        await prisma.teamMember.updateMany({
-          where: { userId: user.id },
-          data: { role: 'admin' },
-        });
-      }
-    } else {
-      // Provision new user in PostgreSQL
-      const primaryTeam = await prisma.team.findFirst({
-        orderBy: { createdAt: 'asc' },
-      });
-
-      user = await prisma.user.create({
-        data: {
-          email: cleanEmail,
-          fullName: fullName?.trim() || cleanEmail.split('@')[0],
-          avatarUrl: avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${cleanEmail}`,
-          auth0Id: auth0Id || null,
-          authProvider: 'auth0',
-        },
-        include: {
-          teamMembers: {
-            where: { removedAt: null },
-            include: { team: true },
-          },
-        },
-      });
-
-      // Automatically attach user to primary workspace
-      if (primaryTeam) {
-        await prisma.teamMember.create({
-          data: {
-            teamId: primaryTeam.id,
-            userId: user.id,
-            role: isAdmin(cleanEmail) ? 'admin' : 'member',
-          },
-        });
-
-        // Re-fetch user with team membership
-        user = await prisma.user.findUnique({
-          where: { id: user.id },
-          include: {
-            teamMembers: {
-              where: { removedAt: null },
-              include: { team: true },
-            },
-          },
-        }) as any;
-      }
-    }
-
-    if (!user) {
-      return res.status(500).json({ error: 'Failed to synchronize Auth0 user.' });
-    }
-
-    // 2. Issue App JWT Token
-    const token = jwt.sign(
-      { id: user.id, email: user.email, fullName: user.fullName },
-      ENV.JWT_SECRET,
-      { expiresIn: ENV.JWT_EXPIRES_IN as any }
-    );
-
-    return res.json({
-      token,
-      user: {
-        id: user.id,
-        email: user.email,
-        fullName: user.fullName,
-        title: user.title,
-        avatarUrl: user.avatarUrl,
-        authProvider: user.authProvider,
-      },
-      teams: (user.teamMembers || []).map((tm: any) => ({
-        teamId: tm.teamId,
-        teamName: tm.team.name,
-        teamSlug: tm.team.slug,
-        role: tm.role,
-        joinedAt: tm.joinedAt,
-      })),
-    });
-  } catch (err: any) {
-    console.error('Auth0 Sync Error:', err);
-    return res.status(500).json({ error: 'Failed to synchronize Auth0 user.', details: err?.message || String(err) });
-  }
-});
-
-// Universal Social OAuth Sync (Google, GitHub, LinkedIn, Auth0)
+// Universal Social OAuth Sync (Google, GitHub)
 authRouter.post('/social-sync', async (req: Request, res: Response) => {
   try {
     const { provider, providerId, email, fullName, avatarUrl, headline } = req.body;
@@ -304,18 +178,18 @@ authRouter.post('/social-sync', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Email is required from OAuth profile.' });
     }
 
-    const validProviders = ['google', 'github', 'linkedin', 'auth0'];
+    const validProviders = ['google', 'github'];
     const chosenProvider = validProviders.includes((provider || '').toLowerCase())
       ? (provider || '').toLowerCase()
       : 'oauth';
 
     const cleanEmail = email.toLowerCase().trim();
 
-    // Check if user exists by auth0Id (used as universal oauth id) or email
+    // Check if user exists by providerId or email
     let user = await prisma.user.findFirst({
       where: {
         OR: [
-          providerId ? { auth0Id: providerId } : {},
+          providerId ? { providerId } : {},
           { email: cleanEmail },
         ],
       },
@@ -332,7 +206,7 @@ authRouter.post('/social-sync', async (req: Request, res: Response) => {
       user = await prisma.user.update({
         where: { id: user.id },
         data: {
-          auth0Id: providerId || user.auth0Id,
+          providerId: providerId || user.providerId,
           authProvider: chosenProvider,
           fullName: fullName?.trim() || user.fullName,
           avatarUrl: avatarUrl || user.avatarUrl,
@@ -364,7 +238,7 @@ authRouter.post('/social-sync', async (req: Request, res: Response) => {
           fullName: fullName?.trim() || cleanEmail.split('@')[0],
           avatarUrl: avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${cleanEmail}`,
           title: headline || `${chosenProvider.toUpperCase()} Verified Member`,
-          auth0Id: providerId || null,
+          providerId: providerId || null,
           authProvider: chosenProvider,
         },
         include: {
@@ -386,7 +260,7 @@ authRouter.post('/social-sync', async (req: Request, res: Response) => {
         });
 
         // Re-fetch user with team membership
-        user = (await prisma.user.findUnique({
+        const refreshedUser = await prisma.user.findUnique({
           where: { id: user.id },
           include: {
             teamMembers: {
@@ -394,7 +268,10 @@ authRouter.post('/social-sync', async (req: Request, res: Response) => {
               include: { team: true },
             },
           },
-        })) as any;
+        });
+        if (refreshedUser) {
+          user = refreshedUser;
+        }
       }
     }
 
@@ -419,7 +296,7 @@ authRouter.post('/social-sync', async (req: Request, res: Response) => {
         avatarUrl: user.avatarUrl,
         authProvider: user.authProvider,
       },
-      teams: (user.teamMembers || []).map((tm: any) => ({
+      teams: user.teamMembers.map((tm: TeamMemberWithTeam) => ({
         teamId: tm.teamId,
         teamName: tm.team.name,
         teamSlug: tm.team.slug,
@@ -450,8 +327,8 @@ authRouter.post('/github-exchange', async (req: Request, res: Response) => {
       });
     }
 
-    // Exchange authorization code for GitHub access token
-    const tokenRes = await fetch('https://github.com/login/oauth/access_token', {
+    // Exchange code for access_token with GitHub
+    const tokenResponse = await fetch('https://github.com/login/oauth/access_token', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -464,7 +341,8 @@ authRouter.post('/github-exchange', async (req: Request, res: Response) => {
       }),
     });
 
-    const tokenData: any = await tokenRes.json();
+    const tokenData = await tokenResponse.json() as any;
+
     if (tokenData.error || !tokenData.access_token) {
       console.error('GitHub token exchange error:', tokenData);
       return res.status(400).json({
@@ -472,30 +350,33 @@ authRouter.post('/github-exchange', async (req: Request, res: Response) => {
       });
     }
 
-    // Fetch user details from GitHub
-    const ghUserRes = await fetch('https://api.github.com/user', {
+    // Fetch user profile from GitHub API
+    const userResponse = await fetch('https://api.github.com/user', {
       headers: {
         Authorization: `Bearer ${tokenData.access_token}`,
         'User-Agent': 'HustleX-Team-Workspace',
       },
     });
-    const ghUser: any = await ghUserRes.json();
 
-    // Fetch email if private
+    const ghUser = await userResponse.json() as any;
+
+    if (!ghUser.id) {
+      return res.status(400).json({ error: 'Failed to fetch user profile from GitHub.' });
+    }
+
+    // Get email
     let email = ghUser.email;
     if (!email) {
       try {
-        const emailsRes = await fetch('https://api.github.com/user/emails', {
+        const emailsResponse = await fetch('https://api.github.com/user/emails', {
           headers: {
             Authorization: `Bearer ${tokenData.access_token}`,
             'User-Agent': 'HustleX-Team-Workspace',
           },
         });
-        const emails: any[] = (await emailsRes.json()) as any[];
-        if (Array.isArray(emails)) {
-          const primary = emails.find((e: any) => e.primary && e.verified) || emails[0];
-          if (primary) email = primary.email;
-        }
+        const emails = await emailsResponse.json() as any[];
+        const primary = emails.find((e: any) => e.primary && e.verified) || emails[0];
+        if (primary) email = primary.email;
       } catch (err) {
         console.warn('Could not fetch user emails from GitHub:', err);
       }
@@ -515,7 +396,7 @@ authRouter.post('/github-exchange', async (req: Request, res: Response) => {
       where: {
         OR: [
           { email: cleanEmail },
-          { auth0Id: providerId },
+          { providerId },
         ],
       },
       include: {
@@ -533,7 +414,7 @@ authRouter.post('/github-exchange', async (req: Request, res: Response) => {
           fullName: fullName || user.fullName,
           avatarUrl: avatarUrl || user.avatarUrl,
           authProvider: 'github',
-          auth0Id: providerId,
+          providerId,
         },
         include: {
           teamMembers: {
@@ -560,7 +441,7 @@ authRouter.post('/github-exchange', async (req: Request, res: Response) => {
           fullName,
           avatarUrl,
           title: ghUser.bio || 'GitHub Developer',
-          auth0Id: providerId,
+          providerId,
           authProvider: 'github',
         },
         include: {
@@ -580,7 +461,7 @@ authRouter.post('/github-exchange', async (req: Request, res: Response) => {
           },
         });
 
-        user = await prisma.user.findUnique({
+        const refreshedUser = await prisma.user.findUnique({
           where: { id: user.id },
           include: {
             teamMembers: {
@@ -588,7 +469,10 @@ authRouter.post('/github-exchange', async (req: Request, res: Response) => {
               include: { team: true },
             },
           },
-        }) as any;
+        });
+        if (refreshedUser) {
+          user = refreshedUser;
+        }
       }
     }
 
@@ -608,7 +492,7 @@ authRouter.post('/github-exchange', async (req: Request, res: Response) => {
         avatarUrl: user!.avatarUrl,
         authProvider: user!.authProvider,
       },
-      teams: (user!.teamMembers || []).map((tm: any) => ({
+      teams: (user!.teamMembers || []).map((tm: TeamMemberWithTeam) => ({
         teamId: tm.teamId,
         teamName: tm.team.name,
         teamSlug: tm.team.slug,
@@ -619,46 +503,5 @@ authRouter.post('/github-exchange', async (req: Request, res: Response) => {
   } catch (err: any) {
     console.error('GitHub exchange error:', err);
     return res.status(500).json({ error: 'Failed to complete GitHub sign-in.', details: err?.message || String(err) });
-  }
-});
-
-// Get current authenticated user profile + dynamic teams & current roles
-authRouter.get('/me', authenticateToken, async (req: Request, res: Response) => {
-  try {
-    const user = await prisma.user.findUnique({
-      where: { id: req.user!.id },
-      include: {
-        teamMembers: {
-          where: { removedAt: null },
-          include: {
-            team: true,
-          },
-        },
-      },
-    });
-
-    if (!user) {
-      return res.status(404).json({ error: 'User not found.' });
-    }
-
-    return res.json({
-      user: {
-        id: user.id,
-        email: user.email,
-        fullName: user.fullName,
-        title: user.title,
-        avatarUrl: user.avatarUrl,
-      },
-      teams: user.teamMembers.map((tm) => ({
-        teamId: tm.teamId,
-        teamName: tm.team.name,
-        teamSlug: tm.team.slug,
-        role: isAdmin(user.email) ? 'admin' : tm.role,
-        joinedAt: tm.joinedAt,
-      })),
-    });
-  } catch (err) {
-    console.error('Get me error:', err);
-    return res.status(500).json({ error: 'Failed to fetch current user profile.' });
   }
 });

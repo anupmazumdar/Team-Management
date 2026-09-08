@@ -4,8 +4,6 @@ import { api } from '../../services/api';
 import { Notification } from '../../types';
 import {
   Bell,
-  CheckCircle,
-  Clock,
   Layers,
   LogOut,
   Users,
@@ -17,7 +15,7 @@ import {
 import { ExportModal } from '../common/ExportModal';
 
 interface NavbarProps {
-  currentTab: string;
+  currentTab?: string;
   setCurrentTab: (tab: string) => void;
 }
 
@@ -31,20 +29,26 @@ export const Navbar: React.FC<NavbarProps> = ({ setCurrentTab }) => {
   const notifRef = useRef<HTMLDivElement>(null);
   const teamRef = useRef<HTMLDivElement>(null);
 
-  const fetchNotifications = async () => {
-    try {
-      const res = await api.get('/notifications');
-      setNotifications(res.data.notifications || []);
-      setUnreadCount(res.data.unreadCount || 0);
-    } catch (err) {
-      // ignore in silent polling
-    }
-  };
-
   useEffect(() => {
-    fetchNotifications();
-    const interval = setInterval(fetchNotifications, 10000);
-    return () => clearInterval(interval);
+    let isMounted = true;
+    const loadNotifications = async () => {
+      try {
+        const res = await api.get('/notifications');
+        if (isMounted) {
+          setNotifications(res.data.notifications || []);
+          setUnreadCount(res.data.unreadCount || 0);
+        }
+      } catch {
+        // ignore in silent polling
+      }
+    };
+
+    loadNotifications();
+    const interval = setInterval(loadNotifications, 10000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, []);
 
   const markAllAsRead = async () => {

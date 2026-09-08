@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { api } from '../../services/api';
 import { TeamMemberWithStats } from '../../types';
-import { X, UserMinus, AlertTriangle, ArrowRight } from 'lucide-react';
+import { X, UserMinus, AlertTriangle } from 'lucide-react';
 
 interface RemoveMemberModalProps {
   isOpen: boolean;

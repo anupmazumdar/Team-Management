@@ -3,14 +3,6 @@ import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
 import { Task } from '../types';
 import { TaskCard } from '../components/tasks/TaskCard';
-import {
-  CheckSquare,
-  PlayCircle,
-  Clock,
-  CheckCircle2,
-  AlertTriangle,
-  Send,
-} from 'lucide-react';
 
 interface MyTasksPageProps {
   onSelectTask: (task: Task) => void;
@@ -20,22 +12,25 @@ export const MyTasksPage: React.FC<MyTasksPageProps> = ({ onSelectTask }) => {
   const { user } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [loading, setLoading] = useState<boolean>(true);
-
-  const fetchMyTasks = async () => {
-    setLoading(true);
-    try {
-      const res = await api.get('/tasks?assignedTo=me');
-      setTasks(res.data || []);
-    } catch (err) {
-      console.error('Failed to load my tasks:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   useEffect(() => {
+    let isMounted = true;
+    const fetchMyTasks = async () => {
+      try {
+        const res = await api.get('/tasks?assignedTo=me');
+        if (isMounted) {
+          setTasks(res.data || []);
+        }
+      } catch (err) {
+        console.error('Failed to load my tasks:', err);
+      }
+    };
+
     fetchMyTasks();
+
+    return () => {
+      isMounted = false;
+    };
   }, [user?.id]);
 
   const filtered = tasks.filter((t) => {

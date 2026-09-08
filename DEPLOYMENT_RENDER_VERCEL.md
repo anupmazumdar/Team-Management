@@ -115,7 +115,7 @@ If you prefer creating the Web Service manually:
 
 Once both are deployed, open your Vercel URL and test:
 1. **Authentication**:
-   - Log in using the Admin account (`admin@hustlex.com`, password `Password123!`), click **"Continue with Auth0 SSO"**, or sign in using the **Google / GitHub / LinkedIn** authenticators.
+   - Log in using your email/password credentials or sign in using the **Google / GitHub** authenticators.
 2. **Mission Assignment**:
    - Click **"+ Create Task"**. Fill in title, description, and the **"Mission Details & On-Time Deliverable Briefing"** textarea.
    - Assign to a team member with a deadline.

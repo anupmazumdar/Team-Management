@@ -1,22 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
-import { Task, TaskComment, TaskReview } from '../types';
+import { Task, TaskComment } from '../types';
 import { StateMachineStepper } from '../components/tasks/StateMachineStepper';
 import { ReviewModal } from '../components/tasks/ReviewModal';
 import {
   ArrowLeft,
-  Calendar,
   CheckSquare,
   Clock,
   MessageSquare,
   ShieldCheck,
-  User,
   Send,
-  PlayCircle,
   AlertTriangle,
   CheckCircle2,
-  FileText,
   RotateCcw,
   Target,
 } from 'lucide-react';
@@ -38,24 +34,37 @@ export const TaskDetailPage: React.FC<TaskDetailPageProps> = ({ taskId, onBack }
   const [loading, setLoading] = useState<boolean>(true);
   const [actionLoading, setActionLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState<number>(0);
 
-  const fetchTaskDetails = async () => {
-    setLoading(true);
-    try {
-      const res = await api.get(`/tasks/${taskId}`);
-      setTask(res.data);
-      setComments(res.data.comments || []);
-    } catch (err: any) {
-      console.error('Failed to load task:', err);
-      setError(err.response?.data?.error || 'Failed to load task');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const reloadTask = () => setRefreshKey((k) => k + 1);
 
   useEffect(() => {
-    fetchTaskDetails();
-  }, [taskId]);
+    let isMounted = true;
+    const loadTask = async () => {
+      try {
+        const res = await api.get(`/tasks/${taskId}`);
+        if (isMounted) {
+          setTask(res.data);
+          setComments(res.data.comments || []);
+        }
+      } catch (err: any) {
+        console.error('Failed to load task:', err);
+        if (isMounted) {
+          setError(err.response?.data?.error || 'Failed to load task');
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadTask();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [taskId, refreshKey]);
 
   if (loading) {
     return (
@@ -102,7 +111,7 @@ export const TaskDetailPage: React.FC<TaskDetailPageProps> = ({ taskId, onBack }
     try {
       const res = await api.post(`/tasks/${task.id}/accept`);
       setTask(res.data);
-      await fetchTaskDetails();
+      reloadTask();
     } catch (err: any) {
       console.error('Accept task failed:', err);
       setError(err.response?.data?.error || 'Failed to accept task');
@@ -122,7 +131,7 @@ export const TaskDetailPage: React.FC<TaskDetailPageProps> = ({ taskId, onBack }
       });
       setTask(res.data);
       setShowSubmitModal(false);
-      await fetchTaskDetails();
+      reloadTask();
     } catch (err: any) {
       console.error('Transition failed:', err);
       setError(err.response?.data?.error || 'Failed to update task state');
@@ -571,7 +580,7 @@ export const TaskDetailPage: React.FC<TaskDetailPageProps> = ({ taskId, onBack }
           isOpen={showReviewModal}
           onClose={() => setShowReviewModal(false)}
           task={task}
-          onReviewSubmitted={() => fetchTaskDetails()}
+          onReviewSubmitted={() => reloadTask()}
         />
       )}
     </div>

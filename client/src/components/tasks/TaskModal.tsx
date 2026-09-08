@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { api } from '../../services/api';
 import { Project, TeamMemberWithStats } from '../../types';
-import { X, Plus, Trash2, Calendar, CheckSquare, ShieldCheck, User, Target } from 'lucide-react';
+import { X, Plus, Trash2, CheckSquare, ShieldCheck, User, Target } from 'lucide-react';
 
 interface TaskModalProps {
   isOpen: boolean;
