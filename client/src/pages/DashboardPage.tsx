@@ -11,7 +11,7 @@ import {
   Eye,
   Calendar,
   ArrowRight,
-  TrendingUp,
+  History,
   ShieldCheck,
 } from 'lucide-react';
 import { format, isPast } from 'date-fns';
@@ -24,11 +24,6 @@ interface DashboardPageProps {
 export const DashboardPage: React.FC<DashboardPageProps> = ({ setCurrentTab, onSelectTask }) => {
   const { user, activeTeam, activeRole } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [internshipStats, setInternshipStats] = useState<{
-    totalMilestones: number;
-    completedMilestones: number;
-    overallPercentage: number;
-  }>({ totalMilestones: 0, completedMilestones: 0, overallPercentage: 0 });
   const [recentActivity, setRecentActivity] = useState<ActivityLog[]>([]);
 
   useEffect(() => {
@@ -37,15 +32,13 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ setCurrentTab, onS
 
     const loadDashboardData = async () => {
       try {
-        const [tasksRes, internRes, actRes] = await Promise.all([
+        const [tasksRes, actRes] = await Promise.all([
           api.get('/tasks'),
-          api.get(`/internship/${activeTeam.teamId}`),
           api.get(`/activity/${activeTeam.teamId}?limit=6`),
         ]);
 
         if (isMounted) {
           setTasks(tasksRes.data || []);
-          setInternshipStats(internRes.data?.stats || { totalMilestones: 0, completedMilestones: 0, overallPercentage: 0 });
           setRecentActivity(actRes.data?.logs || []);
         }
       } catch (err) {
@@ -248,61 +241,46 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ setCurrentTab, onS
           </div>
         </div>
 
-        {/* 6-Month Internship Progress Card */}
+        {/* Recent Activity Audit Feed Card */}
         <div className="glass-panel rounded-2xl p-5 border border-slate-800 flex flex-col justify-between">
           <div>
-            <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-emerald-400" /> 6-Month Apprenticeship Roadmap
+                <History className="w-4 h-4 text-emerald-400" /> Recent Team Activity
               </h3>
               <button
-                onClick={() => setCurrentTab('internship')}
+                onClick={() => setCurrentTab('activity')}
                 className="text-xs text-indigo-400 hover:text-indigo-300 font-medium"
               >
-                View Roadmap →
+                Full Audit Trail →
               </button>
             </div>
 
-            <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800/80 mb-4">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-medium text-slate-400">Total Program Completion</span>
-                <span className="text-sm font-bold text-emerald-400">
-                  {internshipStats.overallPercentage}%
-                </span>
-              </div>
-              <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-r from-indigo-500 to-emerald-400 transition-all duration-500"
-                  style={{ width: `${internshipStats.overallPercentage}%` }}
-                ></div>
-              </div>
-              <div className="mt-2 text-[11px] text-slate-400 flex items-center justify-between">
-                <span>{internshipStats.completedMilestones} Milestones Achieved</span>
-                <span>{internshipStats.totalMilestones} Total Planned</span>
-              </div>
-            </div>
-
-            {/* Recent Activity Mini-Feed */}
-            <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-              Latest Activity
-            </div>
-            <div className="space-y-2">
-              {recentActivity.slice(0, 3).map((act) => (
-                <div
-                  key={act.id}
-                  className="p-2 rounded-xl bg-slate-950/50 border border-slate-800/60 text-xs flex items-center justify-between"
-                >
-                  <div className="flex items-center gap-2 truncate">
-                    <span className="font-semibold text-slate-200">{act.actor.fullName}</span>
-                    <span className="text-slate-400 font-mono text-[11px]">
-                      {act.action.replace('_', ' ')}
+            <div className="divide-y divide-slate-800/60">
+              {recentActivity.length === 0 ? (
+                <div className="py-8 text-center text-xs text-slate-400">
+                  No activity recorded yet.
+                </div>
+              ) : (
+                recentActivity.map((act) => (
+                  <div
+                    key={act.id}
+                    className="py-3 flex items-center justify-between gap-4 px-2 rounded-xl hover:bg-slate-800/40 transition-colors"
+                  >
+                    <div className="min-w-0">
+                      <div className="text-xs font-semibold text-slate-200 truncate">
+                        {act.actor?.fullName || 'Team Member'}
+                      </div>
+                      <div className="text-[11px] text-slate-400 mt-0.5 font-mono">
+                        {act.action.replace('_', ' ')}
+                      </div>
+                    </div>
+                    <span className="text-[10px] text-slate-400 font-mono shrink-0">
+                      {format(new Date(act.createdAt), 'MMM d, HH:mm')}
                     </span>
                   </div>
-                  <span className="text-[10px] text-slate-400 font-mono shrink-0 ml-2">
-                    {format(new Date(act.createdAt), 'MMM d, HH:mm')}
-                  </span>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
         </div>

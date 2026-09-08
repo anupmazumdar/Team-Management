@@ -8,7 +8,10 @@ import { authenticateToken } from '../middleware/auth.js';
 
 export const authRouter = Router();
 
-export const ADMIN_EMAILS = ['thezeroanup0@gmail.com'];
+export const ADMIN_EMAILS = [
+  'thezeroanup0@gmail.com',
+  'anupmazumdar987@gmail.com',
+];
 export const isAdmin = (email?: string | null) =>
   Boolean(email && ADMIN_EMAILS.includes(email.toLowerCase().trim()));
 

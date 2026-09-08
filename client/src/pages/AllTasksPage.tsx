@@ -231,7 +231,7 @@ export const AllTasksPage: React.FC<AllTasksPageProps> = ({ onSelectTask }) => {
 
       {/* Main Board / List */}
       {viewMode === 'kanban' ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 overflow-x-auto pb-4">
+        <div className="flex gap-4 overflow-x-auto pb-6 pt-1 items-start">
           {columns.map((col) => {
             const Icon = col.icon;
             const colTasks = filteredTasks.filter((t) => t.status === col.status);
@@ -239,7 +239,7 @@ export const AllTasksPage: React.FC<AllTasksPageProps> = ({ onSelectTask }) => {
             return (
               <div
                 key={col.status}
-                className="bg-slate-900/40 rounded-2xl p-3 border border-slate-800/80 flex flex-col min-w-[240px]"
+                className="bg-slate-900/50 rounded-2xl p-3.5 border border-slate-800/80 flex flex-col w-[290px] min-w-[290px] shrink-0"
               >
                 {/* Column Header */}
                 <div className="flex items-center justify-between px-2 py-2 mb-2">

@@ -13,7 +13,6 @@ import { ProjectsPage } from './pages/ProjectsPage';
 import { ProjectDetailPage } from './pages/ProjectDetailPage';
 import { TeamPage } from './pages/TeamPage';
 import { ChatPage } from './pages/ChatPage';
-import { InternshipTimelinePage } from './pages/InternshipTimelinePage';
 import { ReviewQueuePage } from './pages/ReviewQueuePage';
 import { ActivityLogsPage } from './pages/ActivityLogsPage';
 import { NotificationsPage } from './pages/NotificationsPage';
@@ -125,8 +124,6 @@ const MainWorkspace: React.FC = () => {
           {currentTab === 'team' && <TeamPage />}
 
           {currentTab === 'chat' && <ChatPage />}
-
-          {currentTab === 'internship' && <InternshipTimelinePage />}
 
           {currentTab === 'review-queue' && (
             <ReviewQueuePage onSelectTask={handleSelectTask} />
