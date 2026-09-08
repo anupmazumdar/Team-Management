@@ -13,7 +13,18 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [emailLoading, setEmailLoading] = useState<boolean>(false);
-  const [socialLoading, setSocialLoading] = useState<boolean>(false);
+  const [socialLoading, setSocialLoading] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      if (window.location.hash.includes('access_token=') && window.location.hash.includes('state=google_oauth')) {
+        return true;
+      }
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('code') && (urlParams.get('state') === 'github_oauth' || !urlParams.get('state'))) {
+        return true;
+      }
+    }
+    return false;
+  });
   const isAnyLoading = emailLoading || socialLoading;
 
   const [error, setError] = useState<string | null>(() => {
@@ -30,41 +41,46 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
   });
   const [socialModalProvider, setSocialModalProvider] = useState<SocialProvider | null>(null);
 
-  const handleGitHubCodeExchange = useCallback(async (code: string) => {
-    setSocialLoading(true);
-    setError(null);
-    try {
-      await loginWithGitHubCode(code);
-    } catch (err: any) {
-      console.error('GitHub code exchange error:', err);
-      if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
-        setError('Request timed out connecting to backend server. Render may be waking up.');
-      } else {
-        setError(
-          err.response?.data?.error ||
-          err.response?.data?.details ||
-          err.message ||
-          'Failed to complete GitHub sign-in. Please ensure GITHUB_CLIENT_SECRET is set in Render environment variables.'
-        );
-      }
-    } finally {
-      setSocialLoading(false);
-    }
-  }, [loginWithGitHubCode]);
-
   // Check for GitHub OAuth ?code= parameter on redirect
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const ghCode = urlParams.get('code');
     const state = urlParams.get('state');
-    if (ghCode && (state === 'github_oauth' || !state)) {
-      window.history.replaceState({}, document.title, window.location.pathname);
-      const timer = setTimeout(() => {
-        handleGitHubCodeExchange(ghCode);
-      }, 0);
-      return () => clearTimeout(timer);
-    }
-  }, [handleGitHubCodeExchange]);
+    if (!ghCode || (state && state !== 'github_oauth')) return;
+
+    window.history.replaceState({}, document.title, window.location.pathname);
+
+    let isMounted = true;
+    const syncGitHubCode = async () => {
+      try {
+        await loginWithGitHubCode(ghCode);
+      } catch (err: any) {
+        console.error('GitHub code exchange error:', err);
+        if (isMounted) {
+          if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
+            setError('Request timed out connecting to backend server. Render may be waking up.');
+          } else {
+            setError(
+              err.response?.data?.error ||
+              err.response?.data?.details ||
+              err.message ||
+              'Failed to complete GitHub sign-in. Please ensure GITHUB_CLIENT_SECRET is set in Render environment variables.'
+            );
+          }
+        }
+      } finally {
+        if (isMounted) {
+          setSocialLoading(false);
+        }
+      }
+    };
+
+    syncGitHubCode();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [loginWithGitHubCode]);
 
   const handleSocialSync = useCallback(async (data: {
     provider: SocialProvider;
@@ -95,53 +111,56 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onGoToRegister }) => {
     import.meta.env.VITE_GOOGLE_CLIENT_ID ||
     '612857418194-j68nke48tjglhvtdql05s8s7tfj4bhpe.apps.googleusercontent.com';
 
-  const handleGoogleTokenSuccess = useCallback(async (accessToken: string) => {
-    setSocialLoading(true);
-    setError(null);
-    try {
-      const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-      const profile = await userInfoRes.json();
-      if (!profile.email) {
-        throw new Error('No email found in Google profile');
-      }
-      await handleSocialSync({
-        provider: 'google',
-        providerId: `google|${profile.sub}`,
-        email: profile.email,
-        fullName: profile.name || profile.email.split('@')[0],
-        avatarUrl: profile.picture,
-        headline: 'Google Verified Member',
-      });
-    } catch (err: any) {
-      console.error('Google profile sync error:', err);
-      if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
-        setError('Request timed out connecting to backend server. Render may be waking up.');
-      } else {
-        setError(err.response?.data?.error || err.response?.data?.details || err.message || 'Failed to sync Google profile with database.');
-      }
-    } finally {
-      setSocialLoading(false);
-    }
-  }, [handleSocialSync]);
-
   // Check for Google OAuth redirect in URL hash (#access_token=...)
   useEffect(() => {
-    if (typeof window !== 'undefined' && window.location.hash) {
-      const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
-      const accessToken = hashParams.get('access_token');
-      const state = hashParams.get('state');
+    if (typeof window === 'undefined' || !window.location.hash) return;
+    const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+    const accessToken = hashParams.get('access_token');
+    const state = hashParams.get('state');
 
-      if (accessToken && state === 'google_oauth') {
-        window.history.replaceState({}, document.title, window.location.pathname);
-        const timer = setTimeout(() => {
-          handleGoogleTokenSuccess(accessToken);
-        }, 0);
-        return () => clearTimeout(timer);
+    if (!accessToken || state !== 'google_oauth') return;
+    window.history.replaceState({}, document.title, window.location.pathname);
+
+    let isMounted = true;
+    const syncGoogleProfile = async () => {
+      try {
+        const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+        const profile = await userInfoRes.json();
+        if (!profile.email) {
+          throw new Error('No email found in Google profile');
+        }
+        await loginWithSocial({
+          provider: 'google',
+          providerId: `google|${profile.sub}`,
+          email: profile.email,
+          fullName: profile.name || profile.email.split('@')[0],
+          avatarUrl: profile.picture,
+          headline: 'Google Verified Member',
+        });
+      } catch (err: any) {
+        console.error('Google profile sync error:', err);
+        if (isMounted) {
+          if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
+            setError('Request timed out connecting to backend server. Render may be waking up.');
+          } else {
+            setError(err.response?.data?.error || err.response?.data?.details || err.message || 'Failed to sync Google profile with database.');
+          }
+        }
+      } finally {
+        if (isMounted) {
+          setSocialLoading(false);
+        }
       }
-    }
-  }, [handleGoogleTokenSuccess]);
+    };
+
+    syncGoogleProfile();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [loginWithSocial]);
 
   // Direct full-page OAuth redirect (100% immune to AdBlock & popup blockers)
   const handleGoogleRealSignIn = () => {
